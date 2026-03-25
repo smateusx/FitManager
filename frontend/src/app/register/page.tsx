@@ -43,7 +43,8 @@ export default function RegisterPage() {
       .single()
 
     if (gymError) {
-      alert('Conta criada, mas erro ao registrar a academia. Contate o suporte.')
+      console.error('Gatilho/RLS Error:', gymError)
+      alert('Erro (Acesso DB): ' + gymError.message)
     } else if (gymData && authData.user) {
       // 3. Elevar os privilégios do usuário recém-criado para ADMIN da sua própria academia
       await supabase.from('perfis').update({
