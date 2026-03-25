@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function RegisterPage() {
@@ -13,11 +15,47 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => setLoading(false), 2000)
+    
+    // 1. Criar a conta de autenticação (Gatilho fará ele nascer como ALUNO com academia_id null)
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { nome_completo: fullName } }
+    })
+
+    if (authError) {
+      alert('Erro ao criar conta: ' + authError.message)
+      setLoading(false)
+      return
+    }
+
+    // Como no Supabase o login automático acontece após o signup, o usuário já estará "logado" nesta sessão.
+    // 2. Criar a academia no banco de dados
+    const { data: gymData, error: gymError } = await supabase
+      .from('academias')
+      .insert({ nome: gymName })
+      .select()
+      .single()
+
+    if (gymError) {
+      alert('Conta criada, mas erro ao registrar a academia. Contate o suporte.')
+    } else if (gymData && authData.user) {
+      // 3. Elevar os privilégios do usuário recém-criado para ADMIN da sua própria academia
+      await supabase.from('perfis').update({
+        academia_id: gymData.id,
+        role: 'ADMIN'
+      }).eq('id', authData.user.id)
+      
+      alert('Conta de academia criada com sucesso!')
+      router.push('/dashboard')
+    }
+
+    setLoading(false)
   }
 
   return (
