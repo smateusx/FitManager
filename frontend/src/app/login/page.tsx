@@ -19,7 +19,7 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -27,8 +27,19 @@ export default function LoginPage() {
     if (error) {
       alert('Erro ao fazer login: ' + error.message)
       setLoading(false)
-    } else {
-      router.push('/dashboard')
+    } else if (data.user) {
+      // Verificar o role do usuário para redirecionar corretamente
+      const { data: perfil } = await supabase
+        .from('perfis')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (perfil?.role === 'ALUNO') {
+        router.push('/meu-treino')
+      } else {
+        router.push('/dashboard')
+      }
     }
   }
 

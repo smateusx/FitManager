@@ -35,11 +35,16 @@ function RegisterAlunoForm() {
     setLoading(true)
     setErrorMsg('')
 
-    // 1. Criar conta no Supabase Auth
+    // Passa academia_id nos metadados — o trigger já cria o perfil com o vínculo correto
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { nome_completo: fullName } }
+      options: {
+        data: {
+          nome_completo: fullName,
+          academia_id: academiaId,  // <-- trigger lê isso e salva no perfil
+        }
+      }
     })
 
     if (authError) {
@@ -54,35 +59,19 @@ function RegisterAlunoForm() {
       return
     }
 
-    // 2. Aguardar o trigger criar o perfil e então atualizar com o academia_id
-    // O trigger é AFTER INSERT, então precisamos de um pequeno delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    const { error: updateError } = await supabase
-      .from('perfis')
-      .update({
-        academia_id: academiaId,
-        telefone: phone,
-        nome_completo: fullName,
-      })
-      .eq('id', authData.user.id)
-
-    if (updateError) {
-      // Mesmo com erro no update, a conta foi criada — informamos o usuário
-      console.error('Erro ao vincular academia:', updateError)
-      setErrorMsg('Conta criada, mas houve um erro ao vincular à academia. Contate o administrador.')
-      setLoading(false)
-      return
+    // Atualizar telefone (não é coberto pelo trigger, mas com a sessão ativa do novo aluno funciona)
+    if (phone) {
+      await new Promise(r => setTimeout(r, 600)) // aguarda o trigger criar o perfil
+      await supabase.from('perfis').update({ telefone: phone }).eq('id', authData.user.id)
     }
 
-    // 3. Deslogar o aluno recém-cadastrado (a sessão foi criada para ele automaticamente pelo Supabase)
+    // Deslogar o aluno recém-cadastrado para não travar a navegação do admin
     await supabase.auth.signOut()
 
     setSuccess(true)
     setLoading(false)
   }
 
-  // Tela de sucesso
   if (success) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4">
@@ -92,7 +81,7 @@ function RegisterAlunoForm() {
           </div>
           <h1 className="text-2xl font-bold text-white">Cadastro Realizado!</h1>
           <p className="text-[#A6A6A6] max-w-xs mx-auto">
-            Sua conta foi criada com sucesso. Você já pode fazer login no sistema.
+            Sua conta foi criada com sucesso. Faça login para acessar seus treinos.
           </p>
           <Button
             onClick={() => router.push('/login')}
@@ -131,55 +120,31 @@ function RegisterAlunoForm() {
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-[#A6A6A6]">Nome Completo</Label>
-              <Input
-                id="fullName"
-                placeholder="Seu nome completo"
+              <Input id="fullName" placeholder="Seu nome completo"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
+                value={fullName} onChange={(e) => setFullName(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone" className="text-[#A6A6A6]">Telefone / WhatsApp</Label>
-              <Input
-                id="phone"
-                placeholder="(DDD) 99999-9999"
+              <Input id="phone" placeholder="(DDD) 99999-9999"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
+                value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#A6A6A6]">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
+              <Input id="email" type="email" placeholder="seu@email.com"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+                value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-[#A6A6A6]">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Mínimo 6 caracteres"
+              <Input id="password" type="password" placeholder="Mínimo 6 caracteres"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={6}
-                required
-              />
+                value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
             </div>
-            <Button
-              type="submit"
+            <Button type="submit"
               className="w-full h-11 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold transition-all shadow-lg shadow-[#F2B705]/20 mt-2"
-              disabled={loading || !academiaId}
-            >
+              disabled={loading || !academiaId}>
               {loading ? 'Criando conta...' : 'Finalizar Cadastro'}
             </Button>
           </form>
@@ -189,7 +154,6 @@ function RegisterAlunoForm() {
   )
 }
 
-// Suspense required because useSearchParams() needs it in Next.js App Router
 export default function RegisterAlunoPage() {
   return (
     <Suspense fallback={
