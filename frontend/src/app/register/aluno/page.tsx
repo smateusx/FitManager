@@ -1,41 +1,41 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CheckCircle2 } from 'lucide-react'
 
-export default function RegisterAlunoPage() {
+function RegisterAlunoForm() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  
+  const [success, setSuccess] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
   const searchParams = useSearchParams()
   const academiaId = searchParams.get('academia_id')
   const router = useRouter()
 
   useEffect(() => {
     if (!academiaId) {
-      alert("Link de convite inválido ou ausente. Peça um novo link à sua academia.")
+      setErrorMsg('Link de convite inválido. Solicite um novo link à sua academia.')
     }
   }, [academiaId])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!academiaId) {
-      alert('Academia não identificada no link de convite.')
-      return
-    }
+    if (!academiaId) return
 
     setLoading(true)
-    
-    // 1. Criar a conta no auth.users (Gatilho fará ele nascer como ALUNO com academia_id nulo no perfis)
+    setErrorMsg('')
+
+    // 1. Criar conta no Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -43,41 +43,73 @@ export default function RegisterAlunoPage() {
     })
 
     if (authError) {
-      alert('Erro ao criar conta: ' + authError.message)
+      setErrorMsg('Erro ao criar conta: ' + authError.message)
       setLoading(false)
       return
     }
 
-    // 2. Atualizar a tabela perfis para vincular à academia correta e adicionar telefone
-    if (authData.user) {
-      const { error: updateError } = await supabase
-        .from('perfis')
-        .update({
-          academia_id: academiaId,
-          telefone: phone
-        })
-        .eq('id', authData.user.id)
-        
-      if (updateError) {
-        alert('Conta foi criada, porém houve um erro ao vincular à academia: ' + updateError.message)
-      } else {
-        alert('Cadastro realizado com sucesso! Você já pode usar o painel do Aluno.')
-        // Por ser aluno, poderíamos redirecionar para um dashboard específico de Aluno
-        // No momento, se ele for para /dashboard, o layout do Admin vai rodar, precisamos tratar isso futuramente.
-        // Mas o MVP de cadastro está concluído.
-        router.push('/')
-      }
+    if (!authData.user) {
+      setErrorMsg('Não foi possível criar a conta. Tente novamente.')
+      setLoading(false)
+      return
     }
 
+    // 2. Aguardar o trigger criar o perfil e então atualizar com o academia_id
+    // O trigger é AFTER INSERT, então precisamos de um pequeno delay
+    await new Promise(resolve => setTimeout(resolve, 800))
+
+    const { error: updateError } = await supabase
+      .from('perfis')
+      .update({
+        academia_id: academiaId,
+        telefone: phone,
+        nome_completo: fullName,
+      })
+      .eq('id', authData.user.id)
+
+    if (updateError) {
+      // Mesmo com erro no update, a conta foi criada — informamos o usuário
+      console.error('Erro ao vincular academia:', updateError)
+      setErrorMsg('Conta criada, mas houve um erro ao vincular à academia. Contate o administrador.')
+      setLoading(false)
+      return
+    }
+
+    // 3. Deslogar o aluno recém-cadastrado (a sessão foi criada para ele automaticamente pelo Supabase)
+    await supabase.auth.signOut()
+
+    setSuccess(true)
     setLoading(false)
+  }
+
+  // Tela de sucesso
+  if (success) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4">
+        <div className="text-center space-y-4 animate-in zoom-in-95 duration-300">
+          <div className="mx-auto w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center">
+            <CheckCircle2 className="w-9 h-9 text-emerald-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">Cadastro Realizado!</h1>
+          <p className="text-[#A6A6A6] max-w-xs mx-auto">
+            Sua conta foi criada com sucesso. Você já pode fazer login no sistema.
+          </p>
+          <Button
+            onClick={() => router.push('/login')}
+            className="mt-4 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold"
+          >
+            Ir para o Login
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4 relative overflow-hidden">
-      {/* Background gradients */}
       <div className="absolute top-0 right-1/4 w-[600px] h-[400px] bg-[#BF9004]/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 left-1/4 w-[500px] h-[300px] bg-[#F2B705]/10 blur-[100px] rounded-full pointer-events-none" />
-      
+
       <Card className="w-full max-w-md border-[#585759] bg-[#0D0D0D]/80 backdrop-blur-xl shadow-2xl z-10">
         <CardHeader className="space-y-2 text-center pb-6">
           <div className="mx-auto w-12 h-12 bg-[#F2B705] rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-[#F2B705]/20">
@@ -91,12 +123,17 @@ export default function RegisterAlunoPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {errorMsg && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              {errorMsg}
+            </div>
+          )}
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-[#A6A6A6]">Nome Completo</Label>
-              <Input 
-                id="fullName" 
-                placeholder="Seu nome" 
+              <Input
+                id="fullName"
+                placeholder="Seu nome completo"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -105,9 +142,9 @@ export default function RegisterAlunoPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone" className="text-[#A6A6A6]">Telefone / WhatsApp</Label>
-              <Input 
-                id="phone" 
-                placeholder="(DDD) 99999-9999" 
+              <Input
+                id="phone"
+                placeholder="(DDD) 99999-9999"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -115,10 +152,10 @@ export default function RegisterAlunoPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#A6A6A6]">E-mail</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="seu@email.com" 
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -127,26 +164,40 @@ export default function RegisterAlunoPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-[#A6A6A6]">Senha</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="••••••••" 
+              <Input
+                id="password"
+                type="password"
+                placeholder="Mínimo 6 caracteres"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={6}
                 required
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full h-11 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold transition-all shadow-lg shadow-[#F2B705]/20 mt-2"
               disabled={loading || !academiaId}
             >
-              {loading ? 'Criando...' : 'Finalizar Cadastro'}
+              {loading ? 'Criando conta...' : 'Finalizar Cadastro'}
             </Button>
           </form>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+// Suspense required because useSearchParams() needs it in Next.js App Router
+export default function RegisterAlunoPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D]">
+        <div className="w-10 h-10 border-4 border-[#585759] border-t-[#F2B705] rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterAlunoForm />
+    </Suspense>
   )
 }

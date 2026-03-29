@@ -101,4 +101,15 @@
   html {
     @apply font-sans;
   }
+  button,
+  a,
+  [role="button"],
+  label[for],
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="submit"],
+  input[type="button"] {
+    cursor: pointer;
+  }
 }
