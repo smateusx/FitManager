@@ -24,6 +24,18 @@ export default function DashboardPage() {
       if (!session) { router.push('/login'); return }
       setUser(session.user)
 
+      // Check role and redirect students to their portal
+      const { data: perfil } = await supabase
+        .from('perfis')
+        .select('role, academia_id')
+        .eq('id', session.user.id)
+        .single()
+
+      if (perfil?.role === 'ALUNO') {
+        router.push('/meu-treino')
+        return
+      }
+
       // Count total students (RLS already filters by academia_id)
       const { count: totalAlunos } = await supabase
         .from('perfis')

@@ -13,35 +13,25 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    setErrorMsg('')
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      alert('Erro ao fazer login: ' + error.message)
+      setErrorMsg('E-mail ou senha incorretos. Tente novamente.')
       setLoading(false)
-    } else if (data.user) {
-      // Verificar o role do usuário para redirecionar corretamente
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('role')
-        .eq('id', data.user.id)
-        .single()
-
-      if (perfil?.role === 'ALUNO') {
-        router.push('/meu-treino')
-      } else {
-        router.push('/dashboard')
-      }
+    } else {
+      // Dashboard page handles role-based routing (admin vs aluno)
+      router.push('/dashboard')
     }
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4 relative overflow-hidden">
@@ -61,6 +51,11 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
+            {errorMsg && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                {errorMsg}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#A6A6A6]">E-mail</Label>
               <Input 
