@@ -1,0 +1,81 @@
+================================================================================
+# FITMANAGER SAAS - DOCUMENTO DE CONTEXTO E TRANSFERÊNCIA
+================================================================================
+
+Este documento resume o estado atual do desenvolvimento do FitManager, um SaaS
+brasileiro para gestão de academias, para que outra IA possa retomar o trabalho
+com total clareza técnica e de produto.
+
+--------------------------------------------------------------------------------
+1. TECH STACK & ARQUITETURA
+--------------------------------------------------------------------------------
+- Frontend: Next.js (App Router), Tailwind CSS (v4), Lucid React (ícones), Shadcn UI.
+- Backend: Node.js (Express) com TypeScript (rodando atualmente via ts-node).
+- Banco de Dados & Auth: Supabase (PostgreSQL + RLS).
+- Repositório Git: git@github.com:smateusx/FitManager.git (Branch: main).
+
+--------------------------------------------------------------------------------
+2. O QUE JÁ FOI IMPLEMENTADO (STATUS: FUNCIONAL)
+--------------------------------------------------------------------------------
+- AUTENTICAÇÃO:
+    - Login e Registro de Academia (Admin).
+    - Redirecionamento inteligente por papel (Role): 
+        - Admin/Recepcionista -> /dashboard
+        - Aluno -> /meu-treino
+    - Correção de bugs de confirmação de e-mail e RLS recursiva.
+
+- DASHBOARD ADMINISTRATIVO:
+    - Estatísticas reais puxadas do Supabase (Total de alunos, Planos ativos, Fichas de treino, Alunos sem ficha).
+    - Layout premium (Dark Mode: #0D0D0D, Primary: #F2B705).
+
+- GESTÃO DE ALUNOS:
+    - Listagem dinâmica de alunos vinculados à academia logada.
+    - Sistema de Convite Scalable: Admin gera link único -> Aluno se cadastra -> Automaticamente vinculado à academia via URL (academia_id).
+
+- GESTÃO DE TREINOS:
+    - CRUD completo de Fichas de Treino.
+    - Construtor dinâmico de exercícios (Séries, Reps, Carga, Descanso).
+    - Visual de acordeão para expansão de treinos.
+
+- PORTAL DO ALUNO (/meu-treino):
+    - Área restrita para o aluno ver suas próprias fichas de treino e exercícios.
+
+- PLANOS & PAGAMENTOS:
+    - Cadastro de planos (nome, valor, duração).
+    - Matrícula de alunos em planos com cálculo automático de data de vencimento.
+    - Destaque visual (vermelho) para planos que vencem nos próximos 7 dias.
+
+--------------------------------------------------------------------------------
+3. CONFIGURAÇÕES CRÍTICAS DO SUPABASE (IMPORTANTE)
+--------------------------------------------------------------------------------
+- TABELAS: academias, perfis, fichas_treino, exercicios, planos, matriculas.
+- TRIGGER EM auth.users: Ao criar usuário, insere automaticamente em public.perfis.
+    - O trigger lê 'nome_completo' e 'academia_id' do metadata do auth.signUp.
+- RLS (Row Level Security): Rigorosamente aplicado. O administrador só vê dados de sua academia. O aluno só vê seus próprios treinos e matrículas.
+- FIX RECURSÃO: Foi criada uma função `public.get_my_academia_id()` para evitar loops infinitos nas políticas de segurança da tabela 'perfis'.
+
+--------------------------------------------------------------------------------
+4. PRÓXIMOS PASSOS PROGRAMADOS (BACKLOG)
+--------------------------------------------------------------------------------
+1. [EM ANDAMENTO] PÁGINA DE DETALHES DO ALUNO (Admin): 
+   - Criar /alunos/[id] com abas para Perfil, Histórico de Treinos e Financeiro.
+
+2. [PLANEJADO] EVOLUÇÃO DE CARGA: 
+   - Permitir que o aluno registre quanto peso levantou em cada exercício para gerar gráficos de progresso.
+
+3. [PLANEJADO] FINANCEIRO AVANÇADO:
+   - Dashboard financeiro com gráficos de faturamento mensal e previsão de recebimentos.
+   - Botão para o Admin renovar matrícula com um clique.
+
+4. [PLANEJADO] EDITOR DE PERFIL:
+   - Upload de foto e alteração de senha/e-mail para Admin e Aluno.
+
+--------------------------------------------------------------------------------
+5. COMO RODAR O PROJETO
+--------------------------------------------------------------------------------
+- Frontend: `cd frontend && npm run dev` (Porta 3000)
+- Backend: `cd backend && npx ts-node src/server.ts` (Porta 3001)
+
+================================================================================
+FIM DO DOCUMENTO - ÚLTIMO COMMIT: ac2e0bc
+================================================================================
