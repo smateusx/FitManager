@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Users, Dumbbell, UserCheck, AlertTriangle, TrendingUp, CreditCard, Clock } from 'lucide-react'
+import { Users, Dumbbell, UserCheck, AlertTriangle, TrendingUp, CreditCard, Clock, FileDown, FileSpreadsheet } from 'lucide-react'
 import { RevenueChart } from '@/components/revenue-chart'
+import { ReportsService } from '@/lib/reports-service'
 
 type Stats = {
   totalAlunos: number
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   })
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [isExporting, setIsExporting] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -112,6 +114,58 @@ export default function DashboardPage() {
     loadDashboard()
   }, [router])
 
+  const handleExportPDF = async () => {
+    setIsExporting(true)
+    try {
+      const { data: allMatriculas } = await supabase
+        .from('matriculas')
+        .select('id, valor_pago, criado_em, status, perfis(nome_completo), planos(nome)')
+        .order('criado_em', { ascending: false })
+
+      const columns = ['Aluno', 'Plano', 'Valor', 'Data', 'Status']
+      const rows = (allMatriculas || []).map((m: any) => [
+        m.perfis?.nome_completo || 'N/A',
+        m.planos?.nome || 'Personalizado',
+        `R$ ${Number(m.valor_pago || 0).toFixed(2)}`,
+        new Date(m.criado_em).toLocaleDateString('pt-BR'),
+        m.status
+      ])
+
+      ReportsService.exportToPDF(
+        columns, 
+        rows, 
+        'Relatório Geral de Matrículas e Faturamento',
+        `fitmanager-relatorio-${new Date().toISOString().split('T')[0]}`
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleExportExcel = async () => {
+    setIsExporting(true)
+    try {
+      const { data: allMatriculas } = await supabase
+        .from('matriculas')
+        .select('valor_pago, criado_em, status, perfis(nome_completo), planos(nome)')
+      
+      const formattedData = (allMatriculas || []).map((m: any) => ({
+        'Aluno': m.perfis?.nome_completo,
+        'Plano': m.planos?.nome,
+        'Valor (R$)': Number(m.valor_pago || 0),
+        'Data': new Date(m.criado_em).toLocaleDateString('pt-BR'),
+        'Status': m.status
+      }))
+
+      ReportsService.exportToExcel(
+        formattedData, 
+        `fitmanager-faturamento-${new Date().toISOString().split('T')[0]}`
+      )
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const cards = [
     {
       label: 'Alunos Totais',
@@ -157,12 +211,28 @@ export default function DashboardPage() {
               Bem-vindo de volta, <span className="text-white font-medium">{user?.user_metadata?.nome_completo || 'Administrador'}</span>.
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={handleExportPDF}
+              disabled={isExporting}
+              className="px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm font-bold hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
+            </button>
+            <button 
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-sm font-bold hover:bg-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
+            </button>
             <button 
               onClick={() => router.push('/planos')}
-              className="px-4 py-2 bg-[#585759]/20 border border-[#585759]/40 rounded-xl text-white text-sm font-medium hover:bg-[#585759]/30 transition-colors flex items-center gap-2"
+              className="px-4 py-2.5 bg-[#F2B705] border border-[#F2B705] rounded-xl text-[#0D0D0D] text-sm font-bold hover:brightness-110 transition-all flex items-center gap-2"
             >
-              <CreditCard className="w-4 h-4 text-[#F2B705]" />
+              <CreditCard className="w-4 h-4" />
               Financeiro
             </button>
           </div>
