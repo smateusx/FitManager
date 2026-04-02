@@ -39,11 +39,14 @@ com total clareza técnica e de produto.
 
 - PORTAL DO ALUNO (/meu-treino):
     - Área restrita para o aluno ver suas próprias fichas de treino e exercícios.
+    - [NOVO] Aba "Matrícula" com transparência total de pagamentos, plano atual e histórico.
+    - [NOVO] Integração com WhatsApp para suporte direto.
 
 - PLANOS & PAGAMENTOS:
     - Cadastro de planos (nome, valor, duração).
     - Matrícula de alunos em planos com cálculo automático de data de vencimento.
     - Destaque visual (vermelho) para planos que vencem nos próximos 7 dias.
+    - [NOVO] Central de Cobranças para Admin com notificações automáticas via WhatsApp (View `vencimentos_proximos`).
 
 - PÁGINA DE DETALHES DO ALUNO (Admin): 
     - Criada /alunos/[id] com abas para Perfil, Histórico de Treinos, Financeiro e Evolução.
@@ -63,6 +66,7 @@ com total clareza técnica e de produto.
 3. CONFIGURAÇÕES CRÍTICAS DO SUPABASE (IMPORTANTE)
 --------------------------------------------------------------------------------
 - TABELAS: academias, perfis, fichas_treino, exercicios, planos, matriculas.
+- VIEWS: `vencimentos_proximos` (base para cobranças).
 - TRIGGER EM auth.users: Ao criar usuário, insere automaticamente em public.perfis.
     - O trigger lê 'nome_completo' e 'academia_id' do metadata do auth.signUp.
 - RLS (Row Level Security): Rigorosamente aplicado. O administrador só vê dados de sua academia. O aluno só vê seus próprios treinos e matrículas.
@@ -71,11 +75,12 @@ com total clareza técnica e de produto.
 --------------------------------------------------------------------------------
 4. PRÓXIMOS PASSOS PROGRAMADOS (BACKLOG)
 --------------------------------------------------------------------------------
-1. [EXECUTANDO] DASHBOARD DO ALUNO (FINANCEIRO):
-   - Seção no portal do aluno para ver histórico de pagamentos e status do plano.
-
-2. [PLANEJADO] RELATÓRIOS ADMINISTRATIVOS:
+1. [PLANEJADO] RELATÓRIOS ADMINISTRATIVOS:
    - Exportação de dados financeiros para PDF/Excel.
+   - Relatórios segmentados por plano e período.
+
+2. [PLANEJADO] CONTROLE DE ACESSO (RBAC):
+   - Perfil de "Recepcionista" com permissões limitadas (sem acesso a dashboard financeiro total).
 
 --------------------------------------------------------------------------------
 5. COMO RODAR O PROJETO
@@ -84,5 +89,5 @@ com total clareza técnica e de produto.
 - Backend: `cd backend && npx ts-node src/server.ts` (Porta 3001)
 
 ================================================================================
-FIM DO DOCUMENTO - ÚLTIMO COMMIT: ac2e0bc
+FIM DO DOCUMENTO - ÚLTIMO COMMIT: 50c2725
 ================================================================================
