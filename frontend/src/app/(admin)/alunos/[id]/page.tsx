@@ -15,7 +15,9 @@ import {
   Mail, 
   Calendar,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  X
 } from 'lucide-react'
 
 type Exercicio = {
@@ -63,6 +65,14 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'perfil' | 'treinos' | 'financeiro' | 'evolucao'>('perfil')
+  const [planos, setPlanos] = useState<any[]>([])
+  
+  // Renewal modal states
+  const [showRenewModal, setShowRenewModal] = useState(false)
+  const [selectedPlanoId, setSelectedPlanoId] = useState('')
+  const [renewDate, setRenewDate] = useState('')
+  const [renewValor, setRenewValor] = useState('')
+  const [isRenewing, setIsRenewing] = useState(false)
   
   const router = useRouter()
 
@@ -105,11 +115,63 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
       setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
       
+      // 4. Buscar planos disponíveis para renovação
+      const { data: planosData } = await supabase
+        .from('planos')
+        .select('*')
+        .eq('ativo', true)
+        .order('valor')
+      
+      setPlanos(planosData || [])
+      
       setLoading(false)
     }
 
     fetchData()
   }, [alunoId, router])
+
+  const handleRenewMatricula = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedPlanoId || !aluno || !renewDate) return
+    setIsRenewing(true)
+
+    try {
+      const plano = planos.find(p => p.id === selectedPlanoId)
+      const dataInicio = new Date(renewDate)
+      const dataVencimento = new Date(dataInicio)
+      dataVencimento.setDate(dataVencimento.getDate() + (plano?.duracao_dias || 30))
+
+      const { error } = await supabase
+        .from('matriculas')
+        .insert({
+          academia_id: aluno.academia_id,
+          aluno_id: alunoId,
+          plano_id: selectedPlanoId,
+          data_inicio: renewDate,
+          data_vencimento: dataVencimento.toISOString().split('T')[0],
+          valor_pago: parseFloat(renewValor) || plano?.valor,
+          status: 'ATIVO'
+        })
+
+      if (error) throw error
+
+      setShowRenewModal(false)
+      // Atualizar lista de matrículas
+      const { data: updatedMatriculas } = await supabase
+        .from('matriculas')
+        .select('*, planos(nome, valor)')
+        .eq('aluno_id', alunoId)
+        .order('data_vencimento', { ascending: false })
+      
+      setMatriculas((updatedMatriculas as unknown as Matricula[]) ?? [])
+      alert('Matrícula renovada com sucesso!')
+    } catch (err) {
+      console.error('Erro ao renovar:', err)
+      alert('Erro ao processar renovação.')
+    } finally {
+      setIsRenewing(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -367,7 +429,21 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                   </Button>
                 </div>
               ) : (
-                <div className="border border-[#585759]/50 rounded-xl overflow-hidden shadow-xl">
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-white font-bold text-lg">Histórico de Pagamentos</h2>
+                    <Button 
+                      onClick={() => {
+                        const latestVenc = matriculas[0]?.data_vencimento || new Date().toISOString().split('T')[0]
+                        setRenewDate(latestVenc)
+                        setShowRenewModal(true)
+                      }}
+                      className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20"
+                    >
+                      <Plus className="w-4 h-4 mr-2" /> Renovar Matrícula
+                    </Button>
+                  </div>
+                  <div className="border border-[#585759]/50 rounded-xl overflow-hidden shadow-xl">
                   <table className="w-full text-sm">
                     <thead className="bg-[#585759]/10 text-[#585759] uppercase text-xs tracking-wider text-left">
                       <tr>
@@ -398,11 +474,87 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
+    </div>
+
+      {/* Modal de Renovação Rápida */}
+      {showRenewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#0D0D0D] border border-[#585759] rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center text-white">
+              <h2 className="text-xl font-bold">Renovar Matrícula</h2>
+              <button onClick={() => setShowRenewModal(false)} className="text-[#A6A6A6] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRenewMatricula} className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs text-[#A6A6A6] uppercase font-bold tracking-wider">Novo Plano</label>
+                <select 
+                  value={selectedPlanoId} 
+                  onChange={e => {
+                    setSelectedPlanoId(e.target.value)
+                    const p = planos.find(pl => pl.id === e.target.value)
+                    if (p) setRenewValor(p.valor.toString())
+                  }} 
+                  required
+                  className="w-full h-11 px-4 rounded-xl bg-[#0D0D0D] border border-[#585759]/50 text-white focus:border-[#F2B705] outline-none transition-all"
+                >
+                  <option value="">Selecione um plano...</option>
+                  {planos.map(p => (
+                    <option key={p.id} value={p.id}>{p.nome} — R$ {p.valor.toFixed(2)}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-[#A6A6A6] uppercase font-bold tracking-wider">Data de Início</label>
+                  <input 
+                    type="date" 
+                    value={renewDate} 
+                    onChange={e => setRenewDate(e.target.value)} 
+                    required
+                    className="w-full h-11 px-4 rounded-xl bg-[#0D0D0D] border border-[#585759]/50 text-white focus:border-[#F2B705] outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-[#A6A6A6] uppercase font-bold tracking-wider">Valor Pago (R$)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={renewValor} 
+                    onChange={e => setRenewValor(e.target.value)} 
+                    placeholder="Auto"
+                    className="w-full h-11 px-4 rounded-xl bg-[#0D0D0D] border border-[#585759]/50 text-white focus:border-[#F2B705] outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowRenewModal(false)}
+                  className="flex-1 px-4 py-3 border border-[#585759]/50 rounded-xl text-white font-bold hover:bg-[#585759]/20 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isRenewing || !selectedPlanoId}
+                  className="flex-1 px-4 py-3 bg-[#F2B705] hover:bg-[#BF9004] disabled:opacity-50 disabled:hover:bg-[#F2B705] text-[#0D0D0D] font-bold rounded-xl shadow-lg shadow-[#F2B705]/20 transition-all"
+                >
+                  {isRenewing ? 'Processando...' : 'Confirmar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
