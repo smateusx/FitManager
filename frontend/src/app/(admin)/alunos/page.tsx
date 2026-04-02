@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { supabase } from '@/lib/supabase'
-import { Copy, X, CheckCircle2 } from 'lucide-react'
+import { Copy, X, CheckCircle2, ChevronRight } from 'lucide-react'
 
 type Aluno = {
   id: string
@@ -110,16 +111,23 @@ export default function AlunosPage() {
                   </TableRow>
                 ) : (
                   alunos.map((aluno) => (
-                    <TableRow key={aluno.id} className="border-[#585759]/30 hover:bg-[#585759]/10 transition-colors">
-                      <TableCell className="font-medium text-white">{aluno.nome_completo || 'Sem Nome'}</TableCell>
+                    <TableRow key={aluno.id} className="border-[#585759]/30 hover:bg-[#585759]/10 transition-colors group">
+                      <TableCell className="font-medium text-white">
+                        <Link href={`/alunos/${aluno.id}`} className="hover:text-[#F2B705] transition-colors flex items-center gap-2">
+                          {aluno.nome_completo || 'Sem Nome'}
+                          <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-[#F2B705]" />
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-[#A6A6A6]">{aluno.telefone || 'Não informado'}</TableCell>
                       <TableCell className="text-[#A6A6A6]">
                         {new Date(aluno.created_at).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" className="text-[#F2B705] hover:text-[#BF9004] hover:bg-[#F2B705]/10">
-                          Ver Detalhes
-                        </Button>
+                        <Link href={`/alunos/${aluno.id}`}>
+                          <Button variant="ghost" className="text-[#F2B705] hover:text-[#BF9004] hover:bg-[#F2B705]/10 h-8 px-3 text-xs">
+                            Ver Detalhes
+                          </Button>
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))
