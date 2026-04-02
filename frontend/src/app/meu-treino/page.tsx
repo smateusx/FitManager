@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Dumbbell, ChevronDown, ChevronUp, LogOut, TrendingUp } from 'lucide-react'
+import { Dumbbell, ChevronDown, ChevronUp, LogOut, TrendingUp, User } from 'lucide-react'
 import { EvolutionChart } from '@/components/evolution-chart'
 
 type Exercicio = {
@@ -37,6 +37,7 @@ export default function AlunoPortalPage() {
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [perfilData, setPerfilData] = useState<any>(null)
 
   const router = useRouter()
 
@@ -48,7 +49,7 @@ export default function AlunoPortalPage() {
 
       const { data: perfil } = await supabase
         .from('perfis')
-        .select('nome_completo, role')
+        .select('nome_completo, role, avatar_url')
         .eq('id', session.user.id)
         .single()
 
@@ -61,6 +62,8 @@ export default function AlunoPortalPage() {
       }
 
       setUserName(perfil.nome_completo || session.user.email || 'Aluno')
+      setUserId(session.user.id)
+      setPerfilData(perfil)
 
       // Buscar as fichas de treino do aluno
       const { data: fichasData } = await supabase
@@ -122,28 +125,43 @@ export default function AlunoPortalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] relative overflow-hidden text-white">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-[500px] h-[400px] bg-[#F2B705]/5 blur-[120px] rounded-full pointer-events-none" />
-
-      {/* Header */}
-      <header className="border-b border-[#585759]/30 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#F2B705] rounded-lg flex items-center justify-center shadow-lg shadow-[#F2B705]/20">
-            <svg className="w-5 h-5 text-[#0D0D0D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+    <div className="min-h-screen bg-[#0D0D0D] text-white">
+      {/* Student Header */}
+      <nav className="sticky top-0 z-30 bg-[#0D0D0D]/80 backdrop-blur-md border-b border-[#585759]/30">
+        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#F2B705] rounded-lg flex items-center justify-center">
+              <Dumbbell className="w-5 h-5 text-[#0D0D0D]" />
+            </div>
+            <span className="font-black text-lg tracking-tighter hidden sm:inline">FitManager</span>
           </div>
-          <span className="text-white font-bold text-lg">FitManager</span>
-        </div>
-        <button onClick={handleLogout}
-          className="flex items-center gap-2 text-[#A6A6A6] hover:text-red-400 transition-colors text-sm">
-          <LogOut className="w-4 h-4" />
-          Sair
-        </button>
-      </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-10 relative z-10">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => router.push('/meu-perfil')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-[#585759]/20 transition-colors group"
+            >
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-[#585759]/50 group-hover:border-[#F2B705]/50 flex items-center justify-center bg-[#585759]/10">
+                {perfilData?.avatar_url ? (
+                  <img src={perfilData.avatar_url} alt={userName} className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
+                )}
+              </div>
+              <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white hidden sm:inline">{userName.split(' ')[0]}</span>
+            </button>
+
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-[#A6A6A6] hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+              title="Sair"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </nav>
+      <main className="max-w-4xl mx-auto px-6 py-10 relative z-10">
         {/* Greeting */}
         <div className="mb-8">
           <p className="text-[#A6A6A6] text-sm uppercase tracking-widest font-semibold mb-1">Portal do Aluno</p>

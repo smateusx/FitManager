@@ -54,6 +54,11 @@ com total clareza técnica e de produto.
     - Registro de peso e repetições direto no portal /meu-treino.
     - Mini-gráficos de progresso acessíveis para o aluno.
 
+- EDITOR DE PERFIL:
+    - Página de configurações para Admin (/perfil) e Aluno (/meu-perfil).
+    - Upload de foto de perfil integrado ao Supabase Storage.
+    - Alteração de nome, telefone e senha.
+
 --------------------------------------------------------------------------------
 3. CONFIGURAÇÕES CRÍTICAS DO SUPABASE (IMPORTANTE)
 --------------------------------------------------------------------------------
@@ -70,8 +75,8 @@ com total clareza técnica e de produto.
    - Dashboard financeiro com gráficos de faturamento mensal e previsão de recebimentos.
    - Botão para o Admin renovar matrícula com um clique.
 
-4. [PLANEJADO] EDITOR DE PERFIL:
-   - Upload de foto e alteração de senha/e-mail para Admin e Aluno.
+1. [PLANEJADO] NOTIFICAÇÕES WHATSAPP:
+   - Configurar disparos automáticos para alunos com mensalidade vencendo.
 
 --------------------------------------------------------------------------------
 5. COMO RODAR O PROJETO
