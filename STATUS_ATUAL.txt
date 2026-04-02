@@ -71,12 +71,11 @@ com total clareza técnica e de produto.
 --------------------------------------------------------------------------------
 4. PRÓXIMOS PASSOS PROGRAMADOS (BACKLOG)
 --------------------------------------------------------------------------------
-1. [PLANEJADO] FINANCEIRO AVANÇADO:
-   - Dashboard financeiro com gráficos de faturamento mensal e previsão de recebimentos.
-   - Botão para o Admin renovar matrícula com um clique.
+1. [EXECUTANDO] DASHBOARD DO ALUNO (FINANCEIRO):
+   - Seção no portal do aluno para ver histórico de pagamentos e status do plano.
 
-1. [PLANEJADO] NOTIFICAÇÕES WHATSAPP:
-   - Configurar disparos automáticos para alunos com mensalidade vencendo.
+2. [PLANEJADO] RELATÓRIOS ADMINISTRATIVOS:
+   - Exportação de dados financeiros para PDF/Excel.
 
 --------------------------------------------------------------------------------
 5. COMO RODAR O PROJETO
