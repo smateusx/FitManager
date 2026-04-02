@@ -45,6 +45,15 @@ com total clareza técnica e de produto.
     - Matrícula de alunos em planos com cálculo automático de data de vencimento.
     - Destaque visual (vermelho) para planos que vencem nos próximos 7 dias.
 
+- PÁGINA DE DETALHES DO ALUNO (Admin): 
+    - Criada /alunos/[id] com abas para Perfil, Histórico de Treinos, Financeiro e Evolução.
+    - Gráficos de evolução de força integrados (recharts).
+    - Botão de WhatsApp personalizado com cores e logo oficial (@v4).
+
+- EVOLUÇÃO DE CARGA (Aluno):
+    - Registro de peso e repetições direto no portal /meu-treino.
+    - Mini-gráficos de progresso acessíveis para o aluno.
+
 --------------------------------------------------------------------------------
 3. CONFIGURAÇÕES CRÍTICAS DO SUPABASE (IMPORTANTE)
 --------------------------------------------------------------------------------
@@ -57,13 +66,7 @@ com total clareza técnica e de produto.
 --------------------------------------------------------------------------------
 4. PRÓXIMOS PASSOS PROGRAMADOS (BACKLOG)
 --------------------------------------------------------------------------------
-1. [EM ANDAMENTO] PÁGINA DE DETALHES DO ALUNO (Admin): 
-   - Criar /alunos/[id] com abas para Perfil, Histórico de Treinos e Financeiro.
-
-2. [PLANEJADO] EVOLUÇÃO DE CARGA: 
-   - Permitir que o aluno registre quanto peso levantou em cada exercício para gerar gráficos de progresso.
-
-3. [PLANEJADO] FINANCEIRO AVANÇADO:
+1. [PLANEJADO] FINANCEIRO AVANÇADO:
    - Dashboard financeiro com gráficos de faturamento mensal e previsão de recebimentos.
    - Botão para o Admin renovar matrícula com um clique.
 

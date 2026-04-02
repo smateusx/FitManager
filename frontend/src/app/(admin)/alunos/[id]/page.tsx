@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EvolutionChart } from '@/components/evolution-chart'
 import { 
   User, 
   Dumbbell, 
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 
 type Exercicio = {
+  id: string
   nome: string
   series: number
   repeticoes: string
@@ -60,7 +62,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'perfil' | 'treinos' | 'financeiro'>('perfil')
+  const [activeTab, setActiveTab] = useState<'perfil' | 'treinos' | 'financeiro' | 'evolucao'>('perfil')
   
   const router = useRouter()
 
@@ -153,14 +155,20 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="flex gap-3">
             <Button 
-              variant="outline" 
-              className="border-[#585759] text-[#A6A6A6] hover:text-white hover:bg-[#585759]/20"
+              className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold shadow-lg shadow-[#25D366]/20 border-none"
               onClick={() => {
                 const tel = aluno?.telefone?.replace(/\D/g, '')
                 if (tel) window.open(`https://wa.me/55${tel}`, '_blank')
               }}
             >
-              <Phone className="w-4 h-4 mr-2" /> WhatsApp
+              <svg 
+                className="w-5 h-5 mr-2 fill-current" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+              WhatsApp
             </Button>
           </div>
         </header>
@@ -170,6 +178,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
           {[
             { id: 'perfil', label: 'Visão Geral', icon: <User className="w-4 h-4" /> },
             { id: 'treinos', label: 'Treinos', icon: <Dumbbell className="w-4 h-4" /> },
+            { id: 'evolucao', label: 'Evolução', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> },
             { id: 'financeiro', label: 'Financeiro', icon: <CreditCard className="w-4 h-4" /> }
           ].map(t => (
             <button 
@@ -298,6 +307,47 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'evolucao' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {fichas.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-[#585759]/30 rounded-2xl">
+                  <Dumbbell className="w-10 h-10 text-[#585759] mx-auto mb-3" />
+                  <p className="text-[#A6A6A6]">Nenhum dado de evolução disponível.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-8">
+                  {fichas.map(ficha => (
+                    <div key={ficha.id} className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-px flex-1 bg-[#585759]/20" />
+                        <h3 className="text-[#A6A6A6] text-[10px] font-bold uppercase tracking-widest px-4 py-1 rounded-full border border-[#585759]/30 bg-[#585759]/5">
+                          {ficha.nome}
+                        </h3>
+                        <div className="h-px flex-1 bg-[#585759]/20" />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {ficha.exercicios.map(ex => (
+                          <Card key={ex.id} className="bg-[#0D0D0D] border-[#585759]/30 overflow-hidden group hover:border-[#F2B705]/30 transition-colors">
+                            <CardHeader className="pb-2 border-b border-[#585759]/10">
+                              <CardTitle className="text-white text-sm font-bold flex items-center justify-between">
+                                {ex.nome}
+                                <span className="text-[10px] text-[#A6A6A6] font-normal uppercase">Meta: {ex.carga || 'Livre'}</span>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-4">
+                              <EvolutionChart exercicioId={ex.id} alunoId={alunoId} />
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
