@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Users, Dumbbell, UserCheck, AlertTriangle, TrendingUp, CreditCard, Clock, FileDown, FileSpreadsheet } from 'lucide-react'
 import { RevenueChart } from '@/components/revenue-chart'
 import { ReportsService } from '@/lib/reports-service'
+import { useAuth } from '@/hooks/use-auth'
 
 type Stats = {
   totalAlunos: number
@@ -25,7 +26,7 @@ type RecentActivity = {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
+  const { profile, loading: authLoading, isReceptionist } = useAuth()
   const [stats, setStats] = useState<Stats>({ 
     totalAlunos: 0, 
     alunosAtivos: 0, 
@@ -40,22 +41,9 @@ export default function DashboardPage() {
   const router = useRouter()
 
   useEffect(() => {
+    if (authLoading) return
+
     const loadDashboard = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-      setUser(session.user)
-
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('role, academia_id')
-        .eq('id', session.user.id)
-        .single()
-
-      if (perfil?.role === 'ALUNO') {
-        router.push('/meu-treino')
-        return
-      }
-
       // 1. Alunos e Treinos
       const { count: totalAlunos } = await supabase
         .from('perfis')
@@ -112,9 +100,10 @@ export default function DashboardPage() {
     }
 
     loadDashboard()
-  }, [router])
+  }, [authLoading, router])
 
   const handleExportPDF = async () => {
+    if (isReceptionist) return
     setIsExporting(true)
     try {
       const { data: allMatriculas } = await supabase
@@ -143,6 +132,7 @@ export default function DashboardPage() {
   }
 
   const handleExportExcel = async () => {
+    if (isReceptionist) return
     setIsExporting(true)
     try {
       const { data: allMatriculas } = await supabase
@@ -176,7 +166,7 @@ export default function DashboardPage() {
       border: 'border-blue-500/20'
     },
     {
-      label: 'Receita (Mês)',
+      label: isReceptionist ? 'Faturamento (Mês)' : 'Receita (Mês)',
       value: `R$ ${stats.receitaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'text-[#F2B705]',
@@ -208,26 +198,30 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold text-[#F2B705]">Painel Administrativo</h1>
             <p className="text-[#A6A6A6] mt-1">
-              Bem-vindo de volta, <span className="text-white font-medium">{user?.user_metadata?.nome_completo || 'Administrador'}</span>.
+              Bem-vindo de volta, <span className="text-white font-medium">{profile?.nome_completo || 'Usuário'}</span>.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button 
-              onClick={handleExportPDF}
-              disabled={isExporting}
-              className="px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm font-bold hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <FileDown className="w-4 h-4" />
-              PDF
-            </button>
-            <button 
-              onClick={handleExportExcel}
-              disabled={isExporting}
-              className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-sm font-bold hover:bg-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Excel
-            </button>
+            {!isReceptionist && (
+              <>
+                <button 
+                  onClick={handleExportPDF}
+                  disabled={isExporting}
+                  className="px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm font-bold hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <FileDown className="w-4 h-4" />
+                  PDF
+                </button>
+                <button 
+                  onClick={handleExportExcel}
+                  disabled={isExporting}
+                  className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-sm font-bold hover:bg-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Excel
+                </button>
+              </>
+            )}
             <button 
               onClick={() => router.push('/planos')}
               className="px-4 py-2.5 bg-[#F2B705] border border-[#F2B705] rounded-xl text-[#0D0D0D] text-sm font-bold hover:brightness-110 transition-all flex items-center gap-2"
@@ -259,19 +253,31 @@ export default function DashboardPage() {
             </div>
 
             <div className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Gráfico de Faturamento */}
-              <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-white font-bold text-lg">Desempenho Financeiro</h2>
-                    <p className="text-[#A6A6A6] text-xs">Faturamento mensal consolidado (R$)</p>
+              {/* Gráfico de Faturamento - Oculto para Recepcionistas conforme plano */}
+              {!isReceptionist ? (
+                <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-white font-bold text-lg">Desempenho Financeiro</h2>
+                      <p className="text-[#A6A6A6] text-xs">Faturamento mensal consolidado (R$)</p>
+                    </div>
+                    <div className="p-2 bg-[#F2B705]/10 rounded-lg">
+                      <TrendingUp className="w-5 h-5 text-[#F2B705]" />
+                    </div>
                   </div>
-                  <div className="p-2 bg-[#F2B705]/10 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-[#F2B705]" />
-                  </div>
+                  <RevenueChart />
                 </div>
-                <RevenueChart />
-              </div>
+              ) : (
+                <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl flex flex-col items-center justify-center text-center p-12">
+                  <div className="p-4 bg-[#585759]/10 rounded-full mb-4">
+                    <TrendingUp className="w-10 h-10 text-[#585759]" />
+                  </div>
+                  <h2 className="text-white font-bold text-xl mb-2">Relatórios Consolidados</h2>
+                  <p className="text-[#A6A6A6] max-w-sm">
+                    Gráficos de desempenho histórico estão restritos ao administrador da unidade.
+                  </p>
+                </div>
+              )}
 
               {/* Atividades Recentes */}
               <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl">

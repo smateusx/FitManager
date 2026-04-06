@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Plus, X, CreditCard, Users, TrendingUp, AlertCircle } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
 
 type Plano = {
   id: string
@@ -38,6 +39,7 @@ const STATUS_COLORS = {
 }
 
 export default function PlanosPage() {
+  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
   const [tab, setTab] = useState<'matriculas' | 'planos'>('matriculas')
   const [planos, setPlanos] = useState<Plano[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
@@ -64,7 +66,10 @@ export default function PlanosPage() {
 
   const router = useRouter()
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { 
+    if (authLoading) return
+    fetchAll() 
+  }, [authLoading])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -97,7 +102,7 @@ export default function PlanosPage() {
 
   const handleSavePlano = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!academiaId) return
+    if (!academiaId || isReceptionist) return
     setSavingPlano(true)
     await supabase.from('planos').insert({
       nome: nomePlano, descricao: descPlano,
@@ -150,10 +155,12 @@ export default function PlanosPage() {
             <p className="text-[#A6A6A6] mt-1">Gerencie matrículas e controle financeiro da academia.</p>
           </div>
           <div className="flex gap-3">
-            <Button onClick={() => setShowPlanoModal(true)} variant="outline"
-              className="border-[#585759] text-white hover:bg-[#585759]/20">
-              <Plus className="w-4 h-4 mr-2" /> Novo Plano
-            </Button>
+            {!isReceptionist && (
+              <Button onClick={() => setShowPlanoModal(true)} variant="outline"
+                className="border-[#585759] text-white hover:bg-[#585759]/20">
+                <Plus className="w-4 h-4 mr-2" /> Novo Plano
+              </Button>
+            )}
             <Button onClick={() => setShowMatriculaModal(true)}
               className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20">
               <Plus className="w-4 h-4 mr-2" /> Nova Matrícula
@@ -167,7 +174,7 @@ export default function PlanosPage() {
             {[
               { label: 'Matrículas Ativas', value: ativos, icon: <Users className="w-5 h-5" />, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
               { label: 'Vencidas', value: vencidos, icon: <AlertCircle className="w-5 h-5" />, color: 'text-red-400', bg: 'bg-red-500/10' },
-              { label: 'Receita (ativas)', value: `R$ ${receitaMes.toFixed(2).replace('.', ',')}`, icon: <TrendingUp className="w-5 h-5" />, color: 'text-[#F2B705]', bg: 'bg-[#F2B705]/10' },
+              { label: isReceptionist ? 'Faturamento Atual' : 'Receita (ativas)', value: `R$ ${receitaMes.toFixed(2).replace('.', ',')}`, icon: <TrendingUp className="w-5 h-5" />, color: 'text-[#F2B705]', bg: 'bg-[#F2B705]/10' },
             ].map((s, i) => (
               <div key={i} className="bg-[#0D0D0D]/80 border border-[#585759]/50 rounded-xl p-5 flex items-center gap-4">
                 <div className={`${s.bg} p-3 rounded-xl`}><span className={s.color}>{s.icon}</span></div>
@@ -275,7 +282,7 @@ export default function PlanosPage() {
       </div>
 
       {/* Modal Novo Plano */}
-      {showPlanoModal && (
+      {showPlanoModal && !isReceptionist && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-[#0D0D0D] border border-[#585759] rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center">

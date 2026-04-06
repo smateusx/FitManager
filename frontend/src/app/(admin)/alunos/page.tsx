@@ -14,7 +14,10 @@ type Aluno = {
   created_at: string
 }
 
+import { useAuth } from '@/hooks/use-auth'
+
 export default function AlunosPage() {
+  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [loading, setLoading] = useState(true)
   const [academiaId, setAcademiaId] = useState<string | null>(null)
@@ -24,8 +27,9 @@ export default function AlunosPage() {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
+    if (authLoading) return
     fetchAlunos()
-  }, [])
+  }, [authLoading])
 
   const fetchAlunos = async () => {
     setLoading(true)

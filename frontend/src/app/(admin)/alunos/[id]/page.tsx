@@ -17,8 +17,10 @@ import {
   Clock,
   AlertCircle,
   Plus,
-  X
+  X,
+  Trash2
 } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
 
 type Exercicio = {
   id: string
@@ -74,9 +76,12 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [renewValor, setRenewValor] = useState('')
   const [isRenewing, setIsRenewing] = useState(false)
   
+  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
+    if (authLoading) return
+
     const fetchData = async () => {
       setLoading(true)
       const { data: { session } } = await supabase.auth.getSession()
@@ -173,7 +178,22 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  if (loading) {
+  const handleDeleteAluno = async () => {
+    if (!isAdmin) return
+    if (!confirm('TEM CERTEZA? Isso excluirá permanentemente o aluno, suas matrículas e treinos.')) return
+    
+    try {
+      const { error } = await supabase.from('perfis').delete().eq('id', alunoId)
+      if (error) throw error
+      alert('Aluno excluído com sucesso.')
+      router.push('/alunos')
+    } catch (err) {
+      console.error('Erro ao excluir:', err)
+      alert('Erro ao excluir aluno.')
+    }
+  }
+
+  if (loading || authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D]">
         <div className="w-10 h-10 border-4 border-[#585759] border-t-[#F2B705] rounded-full animate-spin" />
@@ -216,6 +236,16 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
           <div className="flex gap-3">
+            {isAdmin && (
+              <Button 
+                variant="outline"
+                className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 font-bold"
+                onClick={handleDeleteAluno}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir
+              </Button>
+            )}
             <Button 
               className="bg-[#25D366] hover:bg-[#128C7E] text-white font-bold shadow-lg shadow-[#25D366]/20 border-none"
               onClick={() => {

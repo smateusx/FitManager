@@ -7,6 +7,7 @@ import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useAuth } from '@/hooks/use-auth'
 
 type Exercicio = {
   id?: string
@@ -35,6 +36,7 @@ type AlunoOption = {
 const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10-12', carga: '', descanso: '60s' }
 
 export default function TreinosPage() {
+  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [alunos, setAlunos] = useState<AlunoOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -51,7 +53,10 @@ export default function TreinosPage() {
 
   const router = useRouter()
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { 
+    if (authLoading) return
+    fetchAll() 
+  }, [authLoading])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -84,7 +89,7 @@ export default function TreinosPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!academiaId || !alunoSel) return
+    if (!academiaId || !alunoSel || isReceptionist) return
     setSaving(true)
 
     const { data: fichaData, error: fichaErr } = await supabase
@@ -113,6 +118,7 @@ export default function TreinosPage() {
   }
 
   const handleDelete = async (id: string) => {
+    if (isReceptionist) return
     if (!confirm('Tem certeza que deseja excluir esta ficha?')) return
     await supabase.from('fichas_treino').delete().eq('id', id)
     fetchAll()
@@ -131,9 +137,11 @@ export default function TreinosPage() {
             <h1 className="text-3xl font-bold text-[#F2B705]">Fichas de Treino</h1>
             <p className="text-[#A6A6A6] mt-1">Crie e gerencie os treinos dos seus alunos.</p>
           </div>
-          <Button onClick={() => setShowModal(true)} className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20">
-            <Plus className="w-4 h-4 mr-2" /> Nova Ficha
-          </Button>
+          {!isReceptionist && (
+            <Button onClick={() => setShowModal(true)} className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20">
+              <Plus className="w-4 h-4 mr-2" /> Nova Ficha
+            </Button>
+          )}
         </header>
 
         <main className="mt-8 space-y-4">
@@ -147,7 +155,9 @@ export default function TreinosPage() {
                 <Dumbbell className="w-10 h-10 text-[#F2B705]" />
               </div>
               <p className="text-white font-semibold text-lg">Nenhuma ficha cadastrada ainda</p>
-              <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em "Nova Ficha" para montar o primeiro treino de um aluno.</p>
+              {!isReceptionist && (
+                <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em "Nova Ficha" para montar o primeiro treino de um aluno.</p>
+              )}
             </div>
           ) : (
             fichas.map((ficha) => {
@@ -174,10 +184,12 @@ export default function TreinosPage() {
                       <span className="text-xs text-[#585759] hidden sm:block">
                         {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
                       </span>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(ficha.id) }}
-                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-[#585759] hover:text-red-500 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {!isReceptionist && (
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(ficha.id) }}
+                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-[#585759] hover:text-red-500 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                       {isExpanded ? <ChevronUp className="w-5 h-5 text-[#A6A6A6]" /> : <ChevronDown className="w-5 h-5 text-[#A6A6A6]" />}
                     </div>
                   </button>
@@ -222,11 +234,11 @@ export default function TreinosPage() {
       </div>
 
       {/* Create Ficha Modal */}
-      {showModal && (
+      {showModal && !isReceptionist && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-[#0D0D0D] border border-[#585759] rounded-2xl w-full max-w-2xl shadow-2xl my-8 animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center sticky top-0 bg-[#0D0D0D] rounded-t-2xl z-10">
-              <h2 className="text-xl font-bold text-white">Nova Ficha de Treino</h2>
+            <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center sticky top-0 bg-[#0D0D0D] rounded-t-2xl z-10 text-white">
+              <h2 className="text-xl font-bold">Nova Ficha de Treino</h2>
               <button onClick={() => { setShowModal(false); resetModal() }} className="text-[#A6A6A6] hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -245,9 +257,9 @@ export default function TreinosPage() {
                   <div className="space-y-2">
                     <Label className="text-[#A6A6A6]">Aluno</Label>
                     <select value={alunoSel} onChange={e => setAlunoSel(e.target.value)} required
-                      className="w-full h-10 px-3 rounded-md bg-[#0D0D0D] border border-[#585759] text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B705]">
+                      className="w-full h-11 px-4 rounded-xl bg-[#0D0D0D] border border-[#585759]/50 text-white focus:border-[#F2B705] outline-none transition-all appearance-none">
                       <option value="">Selecione um aluno...</option>
-                      {alunos.map(a => <option key={a.id} value={a.id}>{a.nome_completo || 'Sem nome'}</option>)}
+                      {alunos.map(a => <option key={a.id} value={a.id} className="bg-[#0D0D0D]">{a.nome_completo || 'Sem nome'}</option>)}
                     </select>
                   </div>
                 </div>
@@ -312,7 +324,7 @@ export default function TreinosPage() {
                 </div>
               </div>
 
-              <div className="p-5 border-t border-[#585759]/30 flex gap-3 justify-end">
+              <div className="p-5 border-t border-[#585759]/30 flex gap-3 justify-end bg-[#585759]/5 rounded-b-2xl">
                 <Button type="button" variant="ghost" onClick={() => { setShowModal(false); resetModal() }}
                   className="text-[#A6A6A6] hover:text-white">Cancelar</Button>
                 <Button type="submit" disabled={saving}
