@@ -3,7 +3,15 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const supabaseUrl = process.env.SUPABASE_URL || ''
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || ''
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+  return value
+}
+
+const supabaseUrl = requireEnv('SUPABASE_URL')
+const supabaseAnonKey = requireEnv('SUPABASE_ANON_KEY')
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
