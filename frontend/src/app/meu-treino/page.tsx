@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { 
   Dumbbell, 
@@ -187,7 +188,13 @@ export default function MeuTreinoPage() {
             >
               <div className="w-8 h-8 rounded-full bg-[#585759]/20 flex items-center justify-center overflow-hidden border border-[#585759]/30 group-hover:border-[#F2B705]/50 transition-all">
                 {userAvatar ? (
-                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                  <Image
+                    src={userAvatar}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
                 )}

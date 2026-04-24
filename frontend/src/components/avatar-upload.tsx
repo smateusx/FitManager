@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Camera, Loader2, User } from 'lucide-react'
 import type { ChangeEvent } from 'react'
+import Image from 'next/image'
 
 interface AvatarUploadProps {
   uid: string
@@ -50,10 +51,12 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       <div className="relative group">
         <div className="w-32 h-32 rounded-3xl bg-[#585759]/20 border-2 border-dashed border-[#585759]/50 flex items-center justify-center overflow-hidden transition-all group-hover:border-[#F2B705]/50 shadow-2xl">
           {url ? (
-            <img 
+            <Image
               src={url} 
               alt="Avatar" 
-              className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+              fill
+              sizes="128px"
+              className="object-cover transition-transform group-hover:scale-110" 
             />
           ) : (
             <User className="w-12 h-12 text-[#585759] group-hover:text-[#F2B705] transition-colors" />
