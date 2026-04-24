@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -8,24 +8,30 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AvatarUpload } from '@/components/avatar-upload'
 import { 
-  Dumbbell, 
   User, 
   Lock, 
-  Save, 
   Loader2, 
   CheckCircle2, 
   ChevronLeft,
   Smartphone,
   LogOut
 } from 'lucide-react'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+
+type PerfilUsuario = {
+  id: string
+  nome_completo: string | null
+  telefone: string | null
+  avatar_url: string | null
+}
 
 export default function AlunoPerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   
-  const [user, setUser] = useState<any>(null)
-  const [perfil, setPerfil] = useState<any>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [perfil, setPerfil] = useState<PerfilUsuario | null>(null)
   
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -34,11 +40,7 @@ export default function AlunoPerfilPage() {
 
   const router = useRouter()
 
-  useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  async function fetchProfile() {
+  const fetchProfile = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
@@ -53,18 +55,24 @@ export default function AlunoPerfilPage() {
 
       if (error) throw error
       
-      setPerfil(data)
-      setNome(data.nome_completo || '')
-      setTelefone(data.telefone || '')
+      const perfilData = data as PerfilUsuario
+      setPerfil(perfilData)
+      setNome(perfilData.nome_completo || '')
+      setTelefone(perfilData.telefone || '')
     } catch (err) {
       console.error('Erro ao carregar perfil:', err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    void fetchProfile()
+  }, [fetchProfile])
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
+    if (!user) return
     setSaving(true)
     setSuccess(null)
 
@@ -81,8 +89,8 @@ export default function AlunoPerfilPage() {
       
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao atualizar perfil: ' + err.message)
+    } catch (err) {
+      alert(`Erro ao atualizar perfil: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
     } finally {
       setSaving(false)
     }
@@ -107,14 +115,15 @@ export default function AlunoPerfilPage() {
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao alterar senha: ' + err.message)
+    } catch (err) {
+      alert(`Erro ao alterar senha: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
     } finally {
       setSaving(false)
     }
   }
 
   async function handleAvatarUpload(url: string) {
+    if (!user) return
     try {
       const { error } = await supabase
         .from('perfis')
@@ -123,11 +132,11 @@ export default function AlunoPerfilPage() {
 
       if (error) throw error
       
-      setPerfil({ ...perfil, avatar_url: url })
+      setPerfil((current) => (current ? { ...current, avatar_url: url } : current))
       setSuccess('Foto de perfil atualizada!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao salvar URL do avatar: ' + err.message)
+    } catch (err) {
+      alert(`Erro ao salvar URL do avatar: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
     }
   }
 
@@ -182,8 +191,8 @@ export default function AlunoPerfilPage() {
           <div className="lg:col-span-1">
             <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl">
               <AvatarUpload 
-                uid={user?.id} 
-                url={perfil?.avatar_url} 
+                uid={user?.id || ''} 
+                url={perfil?.avatar_url ?? null} 
                 onUpload={handleAvatarUpload} 
               />
               

@@ -11,3 +11,60 @@ SaaS voltado para academias de pequeno e médio porte, com foco no mercado brasi
 ## Estrutura do Projeto (Monorepo)
 * `/frontend`: Aplicação web Next.js para a interface.
 * `/backend`: API e serviços em Node.js (se necessário desacoplar do Next.js/Supabase).
+
+## Setup de Ambiente
+
+### Frontend
+```bash
+cd frontend
+cp .env.example .env.local
+# preencha NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
+npm install
+npm run dev
+```
+
+### Backend
+```bash
+cd backend
+cp .env.example .env
+# preencha SUPABASE_URL e SUPABASE_ANON_KEY
+npm install
+npm run dev
+```
+
+## Validação de Qualidade (frontend)
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+## Go-live em Staging (runbook)
+- Documento principal: `STAGING_GO_LIVE_RUNBOOK.md`
+- Preflight automatizado:
+```bash
+bash ./scripts/staging-preflight.sh
+```
+- Ordem de SQL (dry-run / apply):
+```bash
+SUPABASE_DB_URL="postgresql://..." ./scripts/staging-apply-sql.sh
+APPLY=true SUPABASE_DB_URL="postgresql://..." ./scripts/staging-apply-sql.sh
+```
+- Smoke tests funcionais guiados:
+  - `scripts/staging-smoke-tests.md`
+
+### Automação para despausar Supabase + ensaio staging
+Se o projeto Supabase estiver pausado, use:
+
+```bash
+PROJECT_REF=aszpzytdodqgfzqlbmvx SUPABASE_ACCESS_TOKEN=sbp_... \
+  bash ./scripts/supabase-resume-and-staging.sh
+```
+
+Para incluir aplicação real de SQL no staging:
+
+```bash
+APPLY_SQL=true SUPABASE_DB_URL="postgresql://..." \
+PROJECT_REF=aszpzytdodqgfzqlbmvx SUPABASE_ACCESS_TOKEN=sbp_... \
+  bash ./scripts/supabase-resume-and-staging.sh
+```

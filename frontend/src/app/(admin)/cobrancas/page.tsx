@@ -10,7 +10,6 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Clock,
-  ExternalLink,
   Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -62,12 +61,16 @@ export default function CobrancasPage() {
       alert('Aluno sem telefone cadastrado.')
       return
     }
+    if (v.status_vencimento === 'EM_DIA') {
+      alert('Essa matrícula está em dia e não precisa de cobrança.')
+      return
+    }
 
     const mensagem = WhatsAppService.getBillingMessage(
       v.aluno_nome,
       v.plano_nome,
       v.data_vencimento,
-      v.status_vencimento as any
+      v.status_vencimento
     )
 
     const link = WhatsAppService.getLink(v.aluno_telefone, mensagem)

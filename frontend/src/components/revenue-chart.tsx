@@ -13,8 +13,18 @@ import {
   Cell
 } from 'recharts'
 
+type MatriculaResumo = {
+  data_inicio: string
+  valor_pago: number | string | null
+}
+
+type RevenuePoint = {
+  name: string
+  total: number
+}
+
 export function RevenueChart() {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<RevenuePoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -45,7 +55,7 @@ export function RevenueChart() {
           grouped[key] = 0
         }
 
-        (matriculas || []).forEach(m => {
+        ((matriculas as MatriculaResumo[] | null) || []).forEach((m) => {
           const date = new Date(m.data_inicio + 'T12:00:00')
           const key = `${months[date.getMonth()]}/${date.getFullYear().toString().slice(-2)}`
           if (grouped[key] !== undefined) {

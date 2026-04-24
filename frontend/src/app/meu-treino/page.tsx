@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { 
   Dumbbell, 
@@ -37,6 +38,23 @@ type Ficha = {
   exercicios: Exercicio[]
 }
 
+type PerfilAluno = {
+  nome_completo: string | null
+  avatar_url: string | null
+}
+
+type MatriculaAluno = {
+  id: string
+  status: 'ATIVO' | 'VENCIDO' | 'CANCELADO'
+  data_inicio: string
+  data_vencimento: string
+  planos: {
+    nome: string
+    valor: number
+    duracao_dias: number
+  } | null
+}
+
 export default function MeuTreinoPage() {
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,9 +67,8 @@ export default function MeuTreinoPage() {
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [perfilData, setPerfilData] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
-  const [matriculas, setMatriculas] = useState<any[]>([])
+  const [matriculas, setMatriculas] = useState<MatriculaAluno[]>([])
 
   const router = useRouter()
 
@@ -71,11 +88,11 @@ export default function MeuTreinoPage() {
         .eq('id', session.user.id)
         .single()
 
-      if (perfil) {
-        setUserName(perfil.nome_completo || 'Aluno')
-        setUserAvatar(perfil.avatar_url)
+      const perfilData = perfil as PerfilAluno | null
+      if (perfilData) {
+        setUserName(perfilData.nome_completo || 'Aluno')
+        setUserAvatar(perfilData.avatar_url)
         setUserId(session.user.id)
-        setPerfilData(perfil)
       }
 
       // Buscar as fichas de treino do aluno
@@ -85,7 +102,7 @@ export default function MeuTreinoPage() {
         .eq('aluno_id', session.user.id)
         .order('criado_em', { ascending: false })
 
-      setFichas((fichasData as any) ?? [])
+      setFichas((fichasData as Ficha[]) ?? [])
 
       // Buscar histórico de matrículas
       const { data: matriculasData } = await supabase
@@ -94,7 +111,7 @@ export default function MeuTreinoPage() {
         .eq('aluno_id', session.user.id)
         .order('data_vencimento', { ascending: false })
 
-      setMatriculas(matriculasData || [])
+      setMatriculas((matriculasData as MatriculaAluno[]) ?? [])
       setLoading(false)
     }
 
@@ -111,14 +128,19 @@ export default function MeuTreinoPage() {
     
     setIsSaving(true)
     try {
+      const cargaNumerica = Number(cargaValue.replace(',', '.'))
+      if (!Number.isFinite(cargaNumerica)) {
+        alert('Informe uma carga válida.')
+        return
+      }
+
       const { error } = await supabase
-        .from('registros_carga')
+        .from('evolucao_carga')
         .insert({
           aluno_id: userId,
-          exercicio_id: ex.id,
-          carga: cargaValue,
-          repeticoes: parseInt(repsValue),
-          data_registro: new Date().toISOString()
+          exercicio_nome: ex.nome,
+          carga: cargaNumerica,
+          registrado_em: new Date().toISOString().split('T')[0]
         })
 
       if (error) throw error
@@ -166,7 +188,13 @@ export default function MeuTreinoPage() {
             >
               <div className="w-8 h-8 rounded-full bg-[#585759]/20 flex items-center justify-center overflow-hidden border border-[#585759]/30 group-hover:border-[#F2B705]/50 transition-all">
                 {userAvatar ? (
-                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                  <Image
+                    src={userAvatar}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
                 )}
@@ -319,7 +347,7 @@ export default function MeuTreinoPage() {
                                   {/* Gráfico de Evolução */}
                                   {showingChartId === ex.id && userId && (
                                     <div className="mt-4 animate-in zoom-in-95 duration-200">
-                                      <EvolutionChart exercicioId={ex.id} alunoId={userId} />
+                                      <EvolutionChart exercicioId={ex.nome} alunoId={userId} />
                                     </div>
                                   )}
 

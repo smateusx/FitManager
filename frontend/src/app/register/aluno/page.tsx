@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,12 +21,10 @@ function RegisterAlunoForm() {
   const searchParams = useSearchParams()
   const academiaId = searchParams.get('academia_id')
   const router = useRouter()
-
-  useEffect(() => {
-    if (!academiaId) {
-      setErrorMsg('Link de convite inválido. Solicite um novo link à sua academia.')
-    }
-  }, [academiaId])
+  const inviteError = useMemo(
+    () => (!academiaId ? 'Link de convite inválido. Solicite um novo link à sua academia.' : ''),
+    [academiaId]
+  )
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -115,6 +113,11 @@ function RegisterAlunoForm() {
           {errorMsg && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
               {errorMsg}
+            </div>
+          )}
+          {!errorMsg && inviteError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              {inviteError}
             </div>
           )}
           <form onSubmit={handleRegister} className="space-y-4">

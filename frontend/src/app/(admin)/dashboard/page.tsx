@@ -25,6 +25,34 @@ type RecentActivity = {
   data: string
 }
 
+type PerfilRelation = { nome_completo: string | null } | { nome_completo: string | null }[] | null
+type PlanoRelation = { nome: string | null } | { nome: string | null }[] | null
+
+type MatriculaMes = {
+  valor_pago: number | null
+  status: 'ATIVO' | 'VENCIDO' | 'CANCELADO'
+  data_vencimento: string
+}
+
+type MatriculaAtividade = {
+  id: string
+  valor_pago: number | null
+  data_inicio: string
+  status: 'ATIVO' | 'VENCIDO' | 'CANCELADO'
+  perfis: PerfilRelation
+  planos: PlanoRelation
+}
+
+function getNomeCompleto(perfis: PerfilRelation): string {
+  if (Array.isArray(perfis)) return perfis[0]?.nome_completo ?? 'Aluno Desconhecido'
+  return perfis?.nome_completo ?? 'Aluno Desconhecido'
+}
+
+function getNomePlano(planos: PlanoRelation): string {
+  if (Array.isArray(planos)) return planos[0]?.nome ?? 'Plano Personalizado'
+  return planos?.nome ?? 'Plano Personalizado'
+}
+
 export default function DashboardPage() {
   const { profile, loading: authLoading, isReceptionist } = useAuth()
   const [stats, setStats] = useState<Stats>({ 
@@ -60,30 +88,30 @@ export default function DashboardPage() {
       
       const { data: matriculasMes } = await supabase
         .from('matriculas')
-        .select('valor_pago, status, data_vencimento')
-        .gte('criado_em', startOfMonth)
+        .select('valor_pago, status, data_vencimento, data_inicio')
+        .gte('data_inicio', startOfMonth)
 
-      const receita = (matriculasMes || [])
+      const receita = ((matriculasMes as MatriculaMes[] | null) || [])
         .filter(m => m.status === 'ATIVO' && m.valor_pago)
         .reduce((sum, m) => sum + Number(m.valor_pago), 0)
 
-      const vencimentos = (matriculasMes || [])
+      const vencimentos = ((matriculasMes as MatriculaMes[] | null) || [])
         .filter(m => m.status === 'VENCIDO')
         .length
 
       // 3. Atividades Recentes
       const { data: recentData } = await supabase
         .from('matriculas')
-        .select('id, valor_pago, criado_em, perfis(nome_completo), planos(nome)')
-        .order('criado_em', { ascending: false })
+        .select('id, valor_pago, data_inicio, status, perfis(nome_completo), planos(nome)')
+        .order('data_inicio', { ascending: false })
         .limit(5)
 
-      const formattedActivities = (recentData || []).map((m: any) => ({
+      const formattedActivities = ((recentData as MatriculaAtividade[] | null) || []).map((m) => ({
         id: m.id,
-        aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
-        plano_nome: m.planos?.nome || 'Plano Personalizado',
+        aluno_nome: getNomeCompleto(m.perfis),
+        plano_nome: getNomePlano(m.planos),
         valor: Number(m.valor_pago || 0),
-        data: m.criado_em
+        data: m.data_inicio
       }))
 
       setStats({
@@ -100,7 +128,7 @@ export default function DashboardPage() {
     }
 
     loadDashboard()
-  }, [authLoading, router])
+  }, [authLoading])
 
   const handleExportPDF = async () => {
     if (isReceptionist) return
@@ -108,15 +136,15 @@ export default function DashboardPage() {
     try {
       const { data: allMatriculas } = await supabase
         .from('matriculas')
-        .select('id, valor_pago, criado_em, status, perfis(nome_completo), planos(nome)')
-        .order('criado_em', { ascending: false })
+        .select('id, valor_pago, data_inicio, status, perfis(nome_completo), planos(nome)')
+        .order('data_inicio', { ascending: false })
 
       const columns = ['Aluno', 'Plano', 'Valor', 'Data', 'Status']
-      const rows = (allMatriculas || []).map((m: any) => [
-        m.perfis?.nome_completo || 'N/A',
-        m.planos?.nome || 'Personalizado',
+      const rows = ((allMatriculas as MatriculaAtividade[] | null) || []).map((m) => [
+        getNomeCompleto(m.perfis),
+        getNomePlano(m.planos),
         `R$ ${Number(m.valor_pago || 0).toFixed(2)}`,
-        new Date(m.criado_em).toLocaleDateString('pt-BR'),
+        new Date(m.data_inicio).toLocaleDateString('pt-BR'),
         m.status
       ])
 
@@ -137,13 +165,13 @@ export default function DashboardPage() {
     try {
       const { data: allMatriculas } = await supabase
         .from('matriculas')
-        .select('valor_pago, criado_em, status, perfis(nome_completo), planos(nome)')
+        .select('valor_pago, data_inicio, status, perfis(nome_completo), planos(nome)')
       
-      const formattedData = (allMatriculas || []).map((m: any) => ({
-        'Aluno': m.perfis?.nome_completo,
-        'Plano': m.planos?.nome,
+      const formattedData = ((allMatriculas as MatriculaAtividade[] | null) || []).map((m) => ({
+        'Aluno': getNomeCompleto(m.perfis),
+        'Plano': getNomePlano(m.planos),
         'Valor (R$)': Number(m.valor_pago || 0),
-        'Data': new Date(m.criado_em).toLocaleDateString('pt-BR'),
+        'Data': new Date(m.data_inicio).toLocaleDateString('pt-BR'),
         'Status': m.status
       }))
 
