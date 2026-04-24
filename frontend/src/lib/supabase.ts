@@ -17,7 +17,7 @@ import {
   updateDoc,
 } from 'firebase/firestore'
 import { ref, uploadBytes } from 'firebase/storage'
-import { auth, db, storage } from '@/lib/firebase'
+import { auth, db, isStorageEnabled, storage } from '@/lib/firebase'
 
 type SupabaseError = { message: string }
 type QueryFilter =
@@ -49,6 +49,13 @@ function normalizeError(error: unknown): SupabaseError {
   }
 
   return { message: 'Erro inesperado ao processar operação.' }
+}
+
+function storageDisabledError(): SupabaseError {
+  return {
+    message:
+      'Upload de avatar indisponível: Firebase Storage não está configurado no projeto.',
+  }
 }
 
 function mapUser(user: FirebaseUser): SupabaseUser {
@@ -647,6 +654,9 @@ export const supabase: any = {
     from(bucket: string) {
       return {
         async upload(filePath: string, file: Blob) {
+          if (!isStorageEnabled || !storage) {
+            return { data: null, error: storageDisabledError() }
+          }
           try {
             await uploadBytes(ref(storage, `${bucket}/${filePath}`), file)
             return { data: { path: filePath }, error: null }
@@ -655,6 +665,13 @@ export const supabase: any = {
           }
         },
         getPublicUrl(filePath: string) {
+          if (!isStorageEnabled || !storage) {
+            return {
+              data: {
+                publicUrl: '',
+              },
+            }
+          }
           const bucketName = storage.app.options.storageBucket
           const encodedPath = encodeURIComponent(`${bucket}/${filePath}`)
           return {
