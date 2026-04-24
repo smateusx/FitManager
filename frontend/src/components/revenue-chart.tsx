@@ -16,6 +16,7 @@ import {
 export function RevenueChart() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  type RevenueRecord = { data_inicio: string; valor_pago: number | string | null }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,7 +46,7 @@ export function RevenueChart() {
           grouped[key] = 0
         }
 
-        (matriculas || []).forEach(m => {
+        ((matriculas as RevenueRecord[] | null) || []).forEach((m: RevenueRecord) => {
           const date = new Date(m.data_inicio + 'T12:00:00')
           const key = `${months[date.getMonth()]}/${date.getFullYear().toString().slice(-2)}`
           if (grouped[key] !== undefined) {
