@@ -18,30 +18,33 @@ type Props = {
 }
 
 type Registro = {
-  data_registro: string
+  registrado_em: string
   carga: number
-  repeticoes: number
+}
+
+type ChartPoint = Registro & {
+  data: string
 }
 
 export function EvolutionChart({ exercicioId, alunoId }: Props) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       const { data: registros, error } = await supabase
-        .from('registros_carga')
-        .select('data_registro, carga, repeticoes')
-        .eq('exercicio_id', exercicioId)
+        .from('evolucao_carga')
+        .select('registrado_em, carga')
+        .eq('exercicio_nome', exercicioId)
         .eq('aluno_id', alunoId)
-        .order('data_registro', { ascending: true })
+        .order('registrado_em', { ascending: true })
 
       if (error) {
         console.error('Erro ao buscar evolução:', error)
       } else {
-        const formatted = (registros || []).map(r => ({
+        const formatted = (registros ?? []).map((r) => ({
           ...r,
-          data: new Date(r.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          data: new Date(r.registrado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
           carga: Number(r.carga)
         }))
         setData(formatted)

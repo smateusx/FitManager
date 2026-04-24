@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
@@ -36,7 +36,7 @@ type AlunoOption = {
 const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10-12', carga: '', descanso: '60s' }
 
 export default function TreinosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [alunos, setAlunos] = useState<AlunoOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,12 +53,7 @@ export default function TreinosPage() {
 
   const router = useRouter()
 
-  useEffect(() => { 
-    if (authLoading) return
-    fetchAll() 
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return }
@@ -79,7 +74,15 @@ export default function TreinosPage() {
     setFichas((fichasData as Ficha[]) ?? [])
     setAlunos((alunosData as AlunoOption[]) ?? [])
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => { 
+    if (authLoading) return
+    const timer = setTimeout(() => {
+      void fetchAll()
+    }, 1)
+    return () => clearTimeout(timer)
+  }, [authLoading, fetchAll])
 
   const addExercicio = () => setExercicios(prev => [...prev, { ...BLANK_EXERCICIO }])
   const removeExercicio = (i: number) => setExercicios(prev => prev.filter((_, idx) => idx !== i))
@@ -156,7 +159,7 @@ export default function TreinosPage() {
               </div>
               <p className="text-white font-semibold text-lg">Nenhuma ficha cadastrada ainda</p>
               {!isReceptionist && (
-                <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em "Nova Ficha" para montar o primeiro treino de um aluno.</p>
+                <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em &quot;Nova Ficha&quot; para montar o primeiro treino de um aluno.</p>
               )}
             </div>
           ) : (

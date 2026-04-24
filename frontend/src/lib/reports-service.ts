@@ -2,11 +2,15 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+type ExcelCellValue = string | number | boolean | null | undefined
+type ExcelRow = Record<string, ExcelCellValue>
+type PdfCell = string | number | boolean | null
+
 export class ReportsService {
   /**
    * Exporta dados para um arquivo Excel (.xlsx)
    */
-  static exportToExcel(data: any[], fileName: string) {
+  static exportToExcel(data: ExcelRow[], fileName: string) {
     const worksheet = XLSX.utils.json_to_sheet(data)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório')
@@ -18,7 +22,7 @@ export class ReportsService {
   /**
    * Exporta dados para um PDF formatado
    */
-  static exportToPDF(columns: string[], rows: any[][], title: string, fileName: string) {
+  static exportToPDF(columns: string[], rows: PdfCell[][], title: string, fileName: string) {
     const doc = new jsPDF()
 
     // Configurações do Cabeçalho
@@ -61,7 +65,7 @@ export class ReportsService {
     })
 
     // Rodapé
-    const pageCount = (doc as any).internal.getNumberOfPages()
+    const pageCount = doc.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i)
       doc.setFontSize(8)

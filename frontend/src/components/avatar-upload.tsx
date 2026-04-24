@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Camera, Loader2, User } from 'lucide-react'
+import type { ChangeEvent } from 'react'
 
 interface AvatarUploadProps {
   uid: string
@@ -13,7 +14,7 @@ interface AvatarUploadProps {
 export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
 
-  async function uploadAvatar(event: any) {
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true)
 
@@ -36,8 +37,9 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
 
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
       onUpload(data.publicUrl)
-    } catch (error: any) {
-      alert(error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao enviar avatar.'
+      alert(message)
     } finally {
       setUploading(false)
     }

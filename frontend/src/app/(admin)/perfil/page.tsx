@@ -7,23 +7,28 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AvatarUpload } from '@/components/avatar-upload'
 import { Shield, Smartphone, User, Lock, Save, Loader2, CheckCircle2 } from 'lucide-react'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
+
+type Perfil = {
+  id: string
+  role: string | null
+  nome_completo: string | null
+  telefone: string | null
+  avatar_url: string | null
+}
 
 export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   
-  const [user, setUser] = useState<any>(null)
-  const [perfil, setPerfil] = useState<any>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const [perfil, setPerfil] = useState<Perfil | null>(null)
   
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-
-  useEffect(() => {
-    fetchProfile()
-  }, [])
 
   async function fetchProfile() {
     try {
@@ -40,7 +45,7 @@ export default function PerfilPage() {
 
       if (error) throw error
       
-      setPerfil(data)
+      setPerfil(data as Perfil)
       setNome(data.nome_completo || '')
       setTelefone(data.telefone || '')
     } catch (err) {
@@ -52,6 +57,7 @@ export default function PerfilPage() {
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
+    if (!user) return
     setSaving(true)
     setSuccess(null)
 
@@ -68,8 +74,9 @@ export default function PerfilPage() {
       
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao atualizar perfil: ' + err.message)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido'
+      alert('Erro ao atualizar perfil: ' + message)
     } finally {
       setSaving(false)
     }
@@ -94,14 +101,16 @@ export default function PerfilPage() {
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao alterar senha: ' + err.message)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido'
+      alert('Erro ao alterar senha: ' + message)
     } finally {
       setSaving(false)
     }
   }
 
   async function handleAvatarUpload(url: string) {
+    if (!user) return
     try {
       const { error } = await supabase
         .from('perfis')
@@ -110,13 +119,18 @@ export default function PerfilPage() {
 
       if (error) throw error
       
-      setPerfil({ ...perfil, avatar_url: url })
+      setPerfil((prev) => (prev ? { ...prev, avatar_url: url } : prev))
       setSuccess('Foto de perfil atualizada!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao salvar URL do avatar: ' + err.message)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido'
+      alert('Erro ao salvar URL do avatar: ' + message)
     }
   }
+
+  useEffect(() => {
+    void fetchProfile()
+  }, [])
 
   if (loading) {
     return (
@@ -146,8 +160,8 @@ export default function PerfilPage() {
           <div className="lg:col-span-1">
             <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl sticky top-8">
               <AvatarUpload 
-                uid={user?.id} 
-                url={perfil?.avatar_url} 
+                uid={user?.id ?? ''} 
+                url={perfil?.avatar_url ?? null} 
                 onUpload={handleAvatarUpload} 
               />
               

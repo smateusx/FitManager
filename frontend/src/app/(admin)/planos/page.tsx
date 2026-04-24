@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -39,7 +39,7 @@ const STATUS_COLORS = {
 }
 
 export default function PlanosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [tab, setTab] = useState<'matriculas' | 'planos'>('matriculas')
   const [planos, setPlanos] = useState<Plano[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
@@ -66,12 +66,7 @@ export default function PlanosPage() {
 
   const router = useRouter()
 
-  useEffect(() => { 
-    if (authLoading) return
-    fetchAll() 
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return }
@@ -89,7 +84,15 @@ export default function PlanosPage() {
     setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
     setAlunos((alunosData as AlunoOption[]) ?? [])
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => { 
+    if (authLoading) return
+    const timer = setTimeout(() => {
+      void fetchAll()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [authLoading, fetchAll])
 
   // Calcula data de vencimento automaticamente ao mudar plano selecionado
   const calcVencimento = (planoId: string, inicio: string) => {
@@ -144,6 +147,11 @@ export default function PlanosPage() {
   const ativos = matriculas.filter(m => m.status === 'ATIVO').length
   const vencidos = matriculas.filter(m => m.status === 'VENCIDO').length
   const receitaMes = matriculas.filter(m => m.status === 'ATIVO').reduce((sum, m) => sum + (m.valor_pago ?? 0), 0)
+  const vencendoLimite = useMemo(() => {
+    const limite = new Date()
+    limite.setDate(limite.getDate() + 7)
+    return limite
+  }, [])
 
   return (
     <div className="p-8">
@@ -221,7 +229,7 @@ export default function PlanosPage() {
                 {matriculas.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-12 text-[#585759]">Nenhuma matrícula cadastrada ainda.</td></tr>
                 ) : matriculas.map((m) => {
-                  const vencendo = new Date(m.data_vencimento) <= new Date(Date.now() + 7 * 86400000)
+                  const vencendo = new Date(m.data_vencimento) <= vencendoLimite
                   return (
                     <tr key={m.id} className="hover:bg-[#585759]/5 transition-colors">
                       <td className="p-4 text-white font-medium">{m.perfis?.nome_completo || 'Sem nome'}</td>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 export type UserRole = 'ADMIN' | 'RECEPCIONISTA' | 'ALUNO' | null
 
@@ -15,10 +15,9 @@ export interface UserProfile {
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
 
   useEffect(() => {
     async function getSession() {
