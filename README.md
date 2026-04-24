@@ -38,3 +38,17 @@ cd frontend
 npm run lint
 npm run build
 ```
+
+## Go-live em Staging (runbook)
+- Documento principal: `STAGING_GO_LIVE_RUNBOOK.md`
+- Preflight automatizado:
+```bash
+bash ./scripts/staging-preflight.sh
+```
+- Ordem de SQL (dry-run / apply):
+```bash
+SUPABASE_DB_URL="postgresql://..." ./scripts/staging-apply-sql.sh
+APPLY=true SUPABASE_DB_URL="postgresql://..." ./scripts/staging-apply-sql.sh
+```
+- Smoke tests funcionais guiados:
+  - `scripts/staging-smoke-tests.md`
