@@ -52,3 +52,19 @@ APPLY=true SUPABASE_DB_URL="postgresql://..." ./scripts/staging-apply-sql.sh
 ```
 - Smoke tests funcionais guiados:
   - `scripts/staging-smoke-tests.md`
+
+### Automação para despausar Supabase + ensaio staging
+Se o projeto Supabase estiver pausado, use:
+
+```bash
+PROJECT_REF=aszpzytdodqgfzqlbmvx SUPABASE_ACCESS_TOKEN=sbp_... \
+  bash ./scripts/supabase-resume-and-staging.sh
+```
+
+Para incluir aplicação real de SQL no staging:
+
+```bash
+APPLY_SQL=true SUPABASE_DB_URL="postgresql://..." \
+PROJECT_REF=aszpzytdodqgfzqlbmvx SUPABASE_ACCESS_TOKEN=sbp_... \
+  bash ./scripts/supabase-resume-and-staging.sh
+```
