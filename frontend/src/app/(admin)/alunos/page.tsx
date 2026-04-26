@@ -18,7 +18,7 @@ type Aluno = {
 import { useAuth } from '@/hooks/use-auth'
 
 export default function AlunosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading } = useAuth()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [loading, setLoading] = useState(true)
   const [academiaId, setAcademiaId] = useState<string | null>(null)
@@ -26,11 +26,6 @@ export default function AlunosPage() {
   // Modal state
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (authLoading) return
-    fetchAlunos()
-  }, [authLoading])
 
   const fetchAlunos = async () => {
     setLoading(true)
@@ -61,6 +56,13 @@ export default function AlunosPage() {
     
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAlunos()
+    })
+  }, [authLoading])
 
   const inviteLink = academiaId 
     ? `${window.location.origin}/register/aluno?academia_id=${academiaId}`
@@ -109,7 +111,7 @@ export default function AlunosPage() {
                 ) : alunos.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center text-[#A6A6A6]">
-                      Nenhum aluno encontrado. Clique em "Convidar Aluno" para começar.
+                      Nenhum aluno encontrado. Clique em &quot;Convidar Aluno&quot; para começar.
                     </TableCell>
                   </TableRow>
                 ) : (

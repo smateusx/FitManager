@@ -9,6 +9,8 @@ import {
   listFichasByAluno,
   listMatriculasByAlunoWithDetails,
   listPlanosByAcademia,
+  type Perfil,
+  type Plano,
 } from '@/lib/firestore-service'
 import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
@@ -19,11 +21,7 @@ import {
   Dumbbell, 
   CreditCard, 
   ChevronLeft, 
-  Phone, 
-  Mail, 
   Calendar,
-  Clock,
-  AlertCircle,
   Plus,
   X,
   Trash2
@@ -61,10 +59,13 @@ type AlunoDetail = {
   id: string
   nome_completo: string | null
   telefone: string | null
-  role: string
-  created_at: string
-  academia_id: string
+  role: Perfil['role']
+  created_at?: string
+  academia_id: string | null
 }
+
+type TabId = 'perfil' | 'treinos' | 'financeiro' | 'evolucao'
+type PlanoOption = Pick<Plano, 'id' | 'nome' | 'valor' | 'duracao_dias'>
 
 export default function AlunoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -74,8 +75,8 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'perfil' | 'treinos' | 'financeiro' | 'evolucao'>('perfil')
-  const [planos, setPlanos] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<TabId>('perfil')
+  const [planos, setPlanos] = useState<PlanoOption[]>([])
   
   // Renewal modal states
   const [showRenewModal, setShowRenewModal] = useState(false)
@@ -84,7 +85,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [renewValor, setRenewValor] = useState('')
   const [isRenewing, setIsRenewing] = useState(false)
   
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isAdmin } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       
       // 4. Buscar planos disponíveis para renovação
       const planosData = await listPlanosByAcademia(
-        (alunoData.academia_id as string) || '',
+        alunoData.academia_id ?? '',
         true
       )
       setPlanos(planosData)
@@ -124,11 +125,15 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
     }
 
     fetchData()
-  }, [alunoId, router])
+  }, [alunoId, authLoading, router])
 
   const handleRenewMatricula = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedPlanoId || !aluno || !renewDate) return
+    if (!aluno.academia_id) {
+      alert('Academia do aluno não identificada para renovação.')
+      return
+    }
     setIsRenewing(true)
 
     try {
@@ -248,15 +253,15 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* Tabs */}
         <div className="flex gap-1 mt-8 mb-6 border-b border-[#585759]/30">
-          {[
+          {([
             { id: 'perfil', label: 'Visão Geral', icon: <User className="w-4 h-4" /> },
             { id: 'treinos', label: 'Treinos', icon: <Dumbbell className="w-4 h-4" /> },
             { id: 'evolucao', label: 'Evolução', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> },
             { id: 'financeiro', label: 'Financeiro', icon: <CreditCard className="w-4 h-4" /> }
-          ].map(t => (
+          ] as Array<{ id: TabId; label: string; icon: React.ReactNode }>).map((t) => (
             <button 
               key={t.id} 
-              onClick={() => setActiveTab(t.id as any)}
+              onClick={() => setActiveTab(t.id)}
               className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all -mb-px ${
                 activeTab === t.id 
                   ? 'text-[#F2B705] border-b-2 border-[#F2B705]' 

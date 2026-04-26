@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
@@ -93,7 +94,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           >
             <div className="w-8 h-8 rounded-full bg-[#585759]/30 overflow-hidden border border-[#585759]/50">
                {profile.avatar_url ? (
-                 <img src={profile.avatar_url} alt={profile.nome_completo || ''} className="w-full h-full object-cover" />
+                 <Image
+                   src={profile.avatar_url}
+                   alt={profile.nome_completo || ''}
+                   width={32}
+                   height={32}
+                   className="w-full h-full object-cover"
+                   unoptimized
+                 />
                ) : (
                  <div className="w-full h-full flex items-center justify-center text-xs font-bold text-[#A6A6A6]">
                    {profile.nome_completo?.[0] || 'U'}

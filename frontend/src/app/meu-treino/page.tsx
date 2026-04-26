@@ -6,6 +6,7 @@ import { signOut } from 'firebase/auth'
 import { getFirebaseAuth, getFirebaseCurrentUser } from '@/lib/firebase'
 import {
   addRegistroCarga,
+  type MatriculaWithDetails,
   getPerfilById,
   listFichasByAluno,
   listMatriculasByAlunoWithDetails,
@@ -25,6 +26,7 @@ import {
 } from 'lucide-react'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
+import Image from 'next/image'
 
 type Exercicio = {
   id: string
@@ -56,9 +58,8 @@ export default function MeuTreinoPage() {
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [perfilData, setPerfilData] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
-  const [matriculas, setMatriculas] = useState<any[]>([])
+  const [matriculas, setMatriculas] = useState<MatriculaWithDetails[]>([])
 
   const router = useRouter()
 
@@ -78,7 +79,6 @@ export default function MeuTreinoPage() {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserAvatar(perfil.avatar_url ?? null)
         setUserId(currentUser.uid)
-        setPerfilData(perfil)
       }
 
       // Buscar as fichas de treino do aluno
@@ -87,7 +87,7 @@ export default function MeuTreinoPage() {
         listMatriculasByAlunoWithDetails(currentUser.uid),
       ])
 
-      setFichas(fichasData as any)
+      setFichas(fichasData as Ficha[])
       setMatriculas(matriculasData)
       setLoading(false)
     }
@@ -155,7 +155,14 @@ export default function MeuTreinoPage() {
             >
               <div className="w-8 h-8 rounded-full bg-[#585759]/20 flex items-center justify-center overflow-hidden border border-[#585759]/30 group-hover:border-[#F2B705]/50 transition-all">
                 {userAvatar ? (
-                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                  <Image
+                    src={userAvatar}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                    unoptimized
+                  />
                 ) : (
                   <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
                 )}

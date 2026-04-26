@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 
 export function RevenueChart() {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<Array<{ name: string; total: number }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -78,7 +78,7 @@ export function RevenueChart() {
             dataKey="total" 
             radius={[6, 6, 0, 0]}
           >
-            {data.map((entry, index) => (
+            {data.map((_, index) => (
               <Cell 
                 key={`cell-${index}`} 
                 fill={index === data.length - 1 ? '#F2B705' : '#585759'} 

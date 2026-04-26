@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getFirebaseCurrentUser } from '@/lib/firebase'
 import {
@@ -48,7 +48,7 @@ const STATUS_COLORS = {
 }
 
 export default function PlanosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [tab, setTab] = useState<'matriculas' | 'planos'>('matriculas')
   const [planos, setPlanos] = useState<Plano[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
@@ -74,13 +74,14 @@ export default function PlanosPage() {
   const [savingMat, setSavingMat] = useState(false)
 
   const router = useRouter()
+  const now = new Date()
+  const vencendoThreshold = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 7
+  )
 
-  useEffect(() => { 
-    if (authLoading) return
-    fetchAll() 
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     const firebaseUser = await getFirebaseCurrentUser()
     if (!firebaseUser) { router.push('/login'); return }
@@ -106,7 +107,14 @@ export default function PlanosPage() {
     setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
     setAlunos((alunosData as AlunoOption[]) ?? [])
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => { 
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAll()
+    })
+  }, [authLoading, fetchAll])
 
   // Calcula data de vencimento automaticamente ao mudar plano selecionado
   const calcVencimento = (planoId: string, inicio: string) => {
@@ -240,7 +248,7 @@ export default function PlanosPage() {
                 {matriculas.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-12 text-[#585759]">Nenhuma matrícula cadastrada ainda.</td></tr>
                 ) : matriculas.map((m) => {
-                  const vencendo = new Date(m.data_vencimento) <= new Date(Date.now() + 7 * 86400000)
+                  const vencendo = new Date(m.data_vencimento) <= vencendoThreshold
                   return (
                     <tr key={m.id} className="hover:bg-[#585759]/5 transition-colors">
                       <td className="p-4 text-white font-medium">{m.perfis?.nome_completo || 'Sem nome'}</td>
