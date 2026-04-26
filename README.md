@@ -1,5 +1,7 @@
 # FitManager
 
+[![CI](https://github.com/smateusx/FitManager/actions/workflows/ci.yml/badge.svg)](https://github.com/smateusx/FitManager/actions/workflows/ci.yml)
+
 SaaS voltado para academias de pequeno e médio porte, com foco no mercado brasileiro.
 
 ## Stack Técnica (estado atual)
@@ -14,3 +16,7 @@ SaaS voltado para academias de pequeno e médio porte, com foco no mercado brasi
 * `/frontend`: Aplicação web Next.js para a interface.
 * `/backend`: API e serviços em Node.js.
 * `/supabase`: scripts SQL legados (apenas referência histórica durante a migração).
+
+## Qualidade e CI
+* Workflow: `.github/workflows/ci.yml`
+* Branch protection recomendada: `.github/BRANCH_PROTECTION_RECOMMENDED.md`
