@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EvolutionChart } from '@/components/evolution-chart'
@@ -84,8 +85,8 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
     const fetchData = async () => {
       setLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      const user = await getFirebaseCurrentUser()
+      if (!user) { router.push('/login'); return }
 
       // 1. Buscar dados básicos do aluno
       const { data: alunoData, error: alunoErr } = await supabase

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Copy, X, CheckCircle2, ChevronRight } from 'lucide-react'
 
 type Aluno = {
@@ -35,14 +36,14 @@ export default function AlunosPage() {
     setLoading(true)
     
     // 1. Get current admin session
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    const currentUser = await getFirebaseCurrentUser()
+    if (!currentUser) return
     
     // 2. Get academia_id of the admin to build the invite link
     const { data: adminProfile } = await supabase
       .from('perfis')
       .select('academia_id')
-      .eq('id', session.user.id)
+      .eq('id', currentUser.uid)
       .single()
       
     if (adminProfile) {

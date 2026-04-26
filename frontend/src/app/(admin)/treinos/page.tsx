@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -60,10 +61,10 @@ export default function TreinosPage() {
 
   const fetchAll = async () => {
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    const firebaseUser = await getFirebaseCurrentUser()
+    if (!firebaseUser) { router.push('/login'); return }
 
-    const { data: profile } = await supabase.from('perfis').select('academia_id').eq('id', session.user.id).single()
+    const { data: profile } = await supabase.from('perfis').select('academia_id').eq('id', firebaseUser.uid).single()
     if (profile) setAcademiaId(profile.academia_id)
 
     const { data: fichasData } = await supabase

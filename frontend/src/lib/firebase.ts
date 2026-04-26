@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, onAuthStateChanged, type User } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
@@ -46,6 +46,27 @@ export function getFirebaseApp(): FirebaseApp {
 
 export function getFirebaseAuth() {
   return getAuth(getFirebaseApp())
+}
+
+export async function getFirebaseCurrentUser(): Promise<User | null> {
+  const auth = getFirebaseAuth()
+  if (auth.currentUser) {
+    return auth.currentUser
+  }
+
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        unsubscribe()
+        resolve(user)
+      },
+      () => {
+        unsubscribe()
+        resolve(null)
+      }
+    )
+  })
 }
 
 export function getFirebaseDb() {

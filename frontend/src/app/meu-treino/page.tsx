@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { signOut } from 'firebase/auth'
+import { getFirebaseAuth, getFirebaseCurrentUser } from '@/lib/firebase'
 import { 
   Dumbbell, 
   ChevronDown, 
@@ -57,9 +59,9 @@ export default function MeuTreinoPage() {
 
   useEffect(() => {
     async function loadData() {
-      const { data: { session } } = await supabase.auth.getSession()
+      const currentUser = await getFirebaseCurrentUser()
       
-      if (!session) {
+      if (!currentUser) {
         router.push('/login')
         return
       }
@@ -68,13 +70,13 @@ export default function MeuTreinoPage() {
       const { data: perfil } = await supabase
         .from('perfis')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', currentUser.uid)
         .single()
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserAvatar(perfil.avatar_url)
-        setUserId(session.user.id)
+        setUserId(currentUser.uid)
         setPerfilData(perfil)
       }
 
@@ -82,7 +84,7 @@ export default function MeuTreinoPage() {
       const { data: fichasData } = await supabase
         .from('fichas_treino')
         .select('*, exercicios(*)')
-        .eq('aluno_id', session.user.id)
+        .eq('aluno_id', currentUser.uid)
         .order('criado_em', { ascending: false })
 
       setFichas((fichasData as any) ?? [])
@@ -91,7 +93,7 @@ export default function MeuTreinoPage() {
       const { data: matriculasData } = await supabase
         .from('matriculas')
         .select('*, planos(nome, valor, duracao_dias)')
-        .eq('aluno_id', session.user.id)
+        .eq('aluno_id', currentUser.uid)
         .order('data_vencimento', { ascending: false })
 
       setMatriculas(matriculasData || [])
@@ -102,7 +104,7 @@ export default function MeuTreinoPage() {
   }, [router])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut(getFirebaseAuth())
     router.push('/login')
   }
 

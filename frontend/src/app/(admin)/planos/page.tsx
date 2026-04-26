@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -73,10 +74,10 @@ export default function PlanosPage() {
 
   const fetchAll = async () => {
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    const firebaseUser = await getFirebaseCurrentUser()
+    if (!firebaseUser) { router.push('/login'); return }
 
-    const { data: perfil } = await supabase.from('perfis').select('academia_id').eq('id', session.user.id).single()
+    const { data: perfil } = await supabase.from('perfis').select('academia_id').eq('id', firebaseUser.uid).single()
     if (perfil) setAcademiaId(perfil.academia_id)
 
     const [{ data: planosData }, { data: matriculasData }, { data: alunosData }] = await Promise.all([

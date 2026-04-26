@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser, getFirebaseAuth } from '@/lib/firebase'
+import { signOut, updatePassword } from 'firebase/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,15 +42,15 @@ export default function AlunoPerfilPage() {
 
   async function fetchProfile() {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      const firebaseUser = await getFirebaseCurrentUser()
+      if (!firebaseUser) { router.push('/login'); return }
 
-      setUser(session.user)
+      setUser(firebaseUser)
 
       const { data, error } = await supabase
         .from('perfis')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', firebaseUser.uid)
         .single()
 
       if (error) throw error
@@ -75,7 +77,7 @@ export default function AlunoPerfilPage() {
           nome_completo: nome,
           telefone: telefone
         })
-        .eq('id', user.id)
+        .eq('id', user.uid)
 
       if (error) throw error
       
@@ -97,11 +99,11 @@ export default function AlunoPerfilPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
-
-      if (error) throw error
+      const auth = getFirebaseAuth()
+      if (!auth.currentUser) {
+        throw new Error('Sessão expirada. Faça login novamente.')
+      }
+      await updatePassword(auth.currentUser, newPassword)
       
       setSuccess('Senha alterada com sucesso!')
       setNewPassword('')
@@ -119,7 +121,7 @@ export default function AlunoPerfilPage() {
       const { error } = await supabase
         .from('perfis')
         .update({ avatar_url: url })
-        .eq('id', user.id)
+        .eq('id', user.uid)
 
       if (error) throw error
       
@@ -154,7 +156,7 @@ export default function AlunoPerfilPage() {
 
           <button 
             onClick={async () => {
-              await supabase.auth.signOut()
+              await signOut(getFirebaseAuth())
               router.push('/login')
             }}
             className="p-2 text-[#A6A6A6] hover:text-red-500 rounded-xl transition-all"
@@ -182,7 +184,7 @@ export default function AlunoPerfilPage() {
           <div className="lg:col-span-1">
             <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl">
               <AvatarUpload 
-                uid={user?.id} 
+                uid={user?.uid} 
                 url={perfil?.avatar_url} 
                 onUpload={handleAvatarUpload} 
               />

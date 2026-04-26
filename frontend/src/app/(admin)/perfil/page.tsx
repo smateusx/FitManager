@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { updatePassword } from 'firebase/auth'
+import { getFirebaseAuth, getFirebaseCurrentUser } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,15 +29,15 @@ export default function PerfilPage() {
 
   async function fetchProfile() {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      const currentUser = await getFirebaseCurrentUser()
+      if (!currentUser) return
 
-      setUser(session.user)
+      setUser(currentUser)
 
       const { data, error } = await supabase
         .from('perfis')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', currentUser.uid)
         .single()
 
       if (error) throw error
@@ -62,7 +64,7 @@ export default function PerfilPage() {
           nome_completo: nome,
           telefone: telefone
         })
-        .eq('id', user.id)
+        .eq('id', user.uid)
 
       if (error) throw error
       
@@ -84,11 +86,9 @@ export default function PerfilPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
-
-      if (error) throw error
+      const authUser = getFirebaseAuth().currentUser
+      if (!authUser) throw new Error('Sessão inválida para alterar senha.')
+      await updatePassword(authUser, newPassword)
       
       setSuccess('Senha alterada com sucesso!')
       setNewPassword('')
@@ -106,7 +106,7 @@ export default function PerfilPage() {
       const { error } = await supabase
         .from('perfis')
         .update({ avatar_url: url })
-        .eq('id', user.id)
+        .eq('id', user.uid)
 
       if (error) throw error
       
@@ -146,7 +146,7 @@ export default function PerfilPage() {
           <div className="lg:col-span-1">
             <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl sticky top-8">
               <AvatarUpload 
-                uid={user?.id} 
+                uid={user?.uid} 
                 url={perfil?.avatar_url} 
                 onUpload={handleAvatarUpload} 
               />
