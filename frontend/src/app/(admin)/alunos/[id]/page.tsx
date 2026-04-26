@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, use } from 'react'
+import { useEffect, useMemo, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,7 @@ import {
   Dumbbell, 
   CreditCard, 
   ChevronLeft, 
-  Phone, 
-  Mail, 
   Calendar,
-  Clock,
-  AlertCircle,
   Plus,
   X,
   Trash2
@@ -58,6 +54,15 @@ type AlunoDetail = {
   academia_id: string
 }
 
+type PlanoOption = {
+  id: string
+  nome: string
+  valor: number
+  duracao_dias: number
+}
+
+type TabId = 'perfil' | 'treinos' | 'financeiro' | 'evolucao'
+
 export default function AlunoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const alunoId = resolvedParams.id
@@ -66,8 +71,8 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'perfil' | 'treinos' | 'financeiro' | 'evolucao'>('perfil')
-  const [planos, setPlanos] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<TabId>('perfil')
+  const [planos, setPlanos] = useState<PlanoOption[]>([])
   
   // Renewal modal states
   const [showRenewModal, setShowRenewModal] = useState(false)
@@ -76,7 +81,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [renewValor, setRenewValor] = useState('')
   const [isRenewing, setIsRenewing] = useState(false)
   
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isAdmin } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -85,7 +90,11 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
     const fetchData = async () => {
       setLoading(true)
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      if (!session) { 
+        setLoading(false)
+        router.push('/login')
+        return
+      }
 
       // 1. Buscar dados básicos do aluno
       const { data: alunoData, error: alunoErr } = await supabase
@@ -96,6 +105,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
       if (alunoErr || !alunoData) {
         console.error('Erro ao buscar aluno:', alunoErr)
+        setLoading(false)
         router.push('/alunos')
         return
       }
@@ -127,13 +137,13 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         .eq('ativo', true)
         .order('valor')
       
-      setPlanos(planosData || [])
+      setPlanos((planosData as PlanoOption[] | null) ?? [])
       
       setLoading(false)
     }
 
-    fetchData()
-  }, [alunoId, router])
+    void fetchData()
+  }, [alunoId, authLoading, router])
 
   const handleRenewMatricula = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -192,6 +202,12 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       alert('Erro ao excluir aluno.')
     }
   }
+
+  const vencimentoAlertaLimite = useMemo(() => {
+    const limite = new Date()
+    limite.setDate(limite.getDate() + 7)
+    return limite
+  }, [])
 
   if (loading || authLoading) {
     return (
@@ -272,10 +288,10 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
             { id: 'treinos', label: 'Treinos', icon: <Dumbbell className="w-4 h-4" /> },
             { id: 'evolucao', label: 'Evolução', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> },
             { id: 'financeiro', label: 'Financeiro', icon: <CreditCard className="w-4 h-4" /> }
-          ].map(t => (
+          ].map((t) => (
             <button 
               key={t.id} 
-              onClick={() => setActiveTab(t.id as any)}
+              onClick={() => setActiveTab(t.id as TabId)}
               className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all -mb-px ${
                 activeTab === t.id 
                   ? 'text-[#F2B705] border-b-2 border-[#F2B705]' 
@@ -331,7 +347,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                       <div className="text-right">
                         <p className="text-[#585759] text-xs uppercase tracking-wider font-semibold">Vencimento</p>
                         <p className={`mt-1 font-bold ${
-                          new Date(matriculaAtiva.data_vencimento) <= new Date(Date.now() + 7 * 86400000) ? 'text-red-400' : 'text-[#F2B705]'
+                          new Date(matriculaAtiva.data_vencimento) <= vencimentoAlertaLimite ? 'text-red-400' : 'text-[#F2B705]'
                         }`}>
                           {new Date(matriculaAtiva.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
                         </p>
@@ -432,7 +448,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                               </CardTitle>
                             </CardHeader>
                             <CardContent className="pt-4">
-                              <EvolutionChart exercicioId={ex.id} alunoId={alunoId} />
+                              <EvolutionChart exercicioId={ex.nome} alunoId={alunoId} />
                             </CardContent>
                           </Card>
                         ))}
