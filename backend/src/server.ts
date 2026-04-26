@@ -1,19 +1,27 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
+import express from 'express'
+import cors from 'cors'
+import dotenv from 'dotenv'
 
-dotenv.config();
+dotenv.config()
 
-const app = express();
-const PORT = process.env.PORT || 3001;
+export function createApp() {
+  const app = express()
 
-app.use(cors());
-app.use(express.json());
+  app.use(cors())
+  app.use(express.json())
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'FitManager API is running' });
-});
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', message: 'FitManager API is running' })
+  })
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+  return app
+}
+
+if (require.main === module) {
+  const app = createApp()
+  const PORT = process.env.PORT || 3001
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`)
+  })
+}
