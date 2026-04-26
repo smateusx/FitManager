@@ -1,11 +1,14 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node src/server.ts",
-    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit"
+    "lint": "node ./node_modules/eslint/bin/eslint.js \"src/**/*.ts\"",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "build": "node ./node_modules/typescript/bin/tsc",
+    "start": "node dist/server.js",
+    "check": "npm run lint && npm run typecheck && npm run build"
   },
   "keywords": [],
   "author": "",
@@ -20,5 +23,11 @@
     "express": "^5.2.1",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "typescript-eslint": "^8.59.0"
   }
 }
