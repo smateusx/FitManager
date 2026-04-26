@@ -5,7 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { supabase } from '@/lib/supabase'
+import {
+  createUserWithEmailAndPassword,
+  signOut,
+  updateProfile,
+} from 'firebase/auth'
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CheckCircle2 } from 'lucide-react'
 
@@ -35,41 +41,38 @@ function RegisterAlunoForm() {
     setLoading(true)
     setErrorMsg('')
 
-    // Passa academia_id nos metadados — o trigger já cria o perfil com o vínculo correto
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          nome_completo: fullName,
-          academia_id: academiaId,  // <-- trigger lê isso e salva no perfil
-        }
+    try {
+      const auth = getFirebaseAuth()
+      const db = getFirebaseDb()
+
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+
+      if (fullName.trim()) {
+        await updateProfile(credential.user, {
+          displayName: fullName.trim(),
+        })
       }
-    })
 
-    if (authError) {
-      setErrorMsg('Erro ao criar conta: ' + authError.message)
+      await setDoc(doc(db, 'perfis', credential.user.uid), {
+        id: credential.user.uid,
+        role: 'ALUNO',
+        academia_id: academiaId,
+        nome_completo: fullName.trim() || null,
+        telefone: phone.trim() || null,
+        avatar_url: null,
+        created_at: serverTimestamp(),
+      })
+
+      // Deslogar o aluno recém-cadastrado para não travar a navegação do admin
+      await signOut(auth)
+
+      setSuccess(true)
+    } catch (error) {
+      console.error('Erro ao cadastrar aluno:', error)
+      setErrorMsg('Erro ao criar conta. Verifique os dados e tente novamente.')
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (!authData.user) {
-      setErrorMsg('Não foi possível criar a conta. Tente novamente.')
-      setLoading(false)
-      return
-    }
-
-    // Atualizar telefone (não é coberto pelo trigger, mas com a sessão ativa do novo aluno funciona)
-    if (phone) {
-      await new Promise(r => setTimeout(r, 600)) // aguarda o trigger criar o perfil
-      await supabase.from('perfis').update({ telefone: phone }).eq('id', authData.user.id)
-    }
-
-    // Deslogar o aluno recém-cadastrado para não travar a navegação do admin
-    await supabase.auth.signOut()
-
-    setSuccess(true)
-    setLoading(false)
   }
 
   if (success) {
