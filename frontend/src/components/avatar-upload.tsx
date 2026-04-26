@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { getFirebaseStorage } from '@/lib/firebase'
 import { Camera, Loader2, User } from 'lucide-react'
 
 interface AvatarUploadProps {
@@ -13,7 +14,7 @@ interface AvatarUploadProps {
 export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
 
-  async function uploadAvatar(event: any) {
+  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true)
 
@@ -26,18 +27,13 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       const fileName = `${uid}-${Math.random()}.${fileExt}`
       const filePath = `${fileName}`
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file)
-
-      if (uploadError) {
-        throw uploadError
-      }
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
-      onUpload(data.publicUrl)
-    } catch (error: any) {
-      alert(error.message)
+      const storage = getFirebaseStorage()
+      const storageRef = ref(storage, `avatars/${filePath}`)
+      await uploadBytes(storageRef, file)
+      const downloadUrl = await getDownloadURL(storageRef)
+      onUpload(downloadUrl)
+    } catch (error) {
+      alert((error as Error).message)
     } finally {
       setUploading(false)
     }

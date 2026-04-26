@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { supabase } from '@/lib/supabase'
 import { getFirebaseCurrentUser } from '@/lib/firebase'
+import { getPerfilById, listAlunosByAcademia } from '@/lib/firestore-service'
 import { Copy, X, CheckCircle2, ChevronRight } from 'lucide-react'
 
 type Aluno = {
@@ -40,25 +40,23 @@ export default function AlunosPage() {
     if (!currentUser) return
     
     // 2. Get academia_id of the admin to build the invite link
-    const { data: adminProfile } = await supabase
-      .from('perfis')
-      .select('academia_id')
-      .eq('id', currentUser.uid)
-      .single()
+    const adminProfile = await getPerfilById(currentUser.uid)
       
     if (adminProfile) {
       setAcademiaId(adminProfile.academia_id)
     }
 
     // 3. Get all students (RLS automatically filters by your academia)
-    const { data: alunosData } = await supabase
-      .from('perfis')
-      .select('*')
-      .eq('role', 'ALUNO')
-      .order('created_at', { ascending: false })
-
-    if (alunosData) {
-      setAlunos(alunosData as Aluno[])
+    if (adminProfile?.academia_id) {
+      const alunosData = await listAlunosByAcademia(adminProfile.academia_id)
+      setAlunos(
+        alunosData.map((aluno) => ({
+          id: aluno.id,
+          nome_completo: aluno.nome_completo || '',
+          telefone: aluno.telefone || null,
+          created_at: aluno.created_at || new Date().toISOString(),
+        }))
+      )
     }
     
     setLoading(false)

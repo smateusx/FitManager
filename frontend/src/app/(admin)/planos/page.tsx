@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { getFirebaseCurrentUser } from '@/lib/firebase'
+import {
+  createMatricula,
+  createPlano,
+  getPerfilById,
+  listAlunosByAcademia,
+  listMatriculasByAcademiaWithDetails,
+  listPlanosByAcademia,
+  updateMatriculaStatus,
+} from '@/lib/firestore-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -77,13 +85,21 @@ export default function PlanosPage() {
     const firebaseUser = await getFirebaseCurrentUser()
     if (!firebaseUser) { router.push('/login'); return }
 
-    const { data: perfil } = await supabase.from('perfis').select('academia_id').eq('id', firebaseUser.uid).single()
+    const perfil = await getPerfilById(firebaseUser.uid)
     if (perfil) setAcademiaId(perfil.academia_id)
 
-    const [{ data: planosData }, { data: matriculasData }, { data: alunosData }] = await Promise.all([
-      supabase.from('planos').select('*').eq('ativo', true).order('valor'),
-      supabase.from('matriculas').select('*, perfis(nome_completo), planos(nome, valor)').order('data_vencimento', { ascending: true }),
-      supabase.from('perfis').select('id, nome_completo').eq('role', 'ALUNO'),
+    if (!perfil?.academia_id) {
+      setPlanos([])
+      setMatriculas([])
+      setAlunos([])
+      setLoading(false)
+      return
+    }
+
+    const [planosData, matriculasData, alunosData] = await Promise.all([
+      listPlanosByAcademia(perfil.academia_id, true),
+      listMatriculasByAcademiaWithDetails(perfil.academia_id),
+      listAlunosByAcademia(perfil.academia_id),
     ])
 
     setPlanos((planosData as Plano[]) ?? [])
@@ -105,10 +121,12 @@ export default function PlanosPage() {
     e.preventDefault()
     if (!academiaId || isReceptionist) return
     setSavingPlano(true)
-    await supabase.from('planos').insert({
-      nome: nomePlano, descricao: descPlano,
-      valor: parseFloat(valorPlano), duracao_dias: parseInt(duracaoPlano),
-      academia_id: academiaId
+    await createPlano({
+      nome: nomePlano,
+      descricao: descPlano || null,
+      valor: parseFloat(valorPlano),
+      duracao_dias: parseInt(duracaoPlano),
+      academia_id: academiaId,
     })
     setSavingPlano(false)
     setShowPlanoModal(false)
@@ -121,7 +139,7 @@ export default function PlanosPage() {
     if (!academiaId || !matAlunoId || !matPlanoId) return
     setSavingMat(true)
     const vencimento = calcVencimento(matPlanoId, matInicio)
-    await supabase.from('matriculas').insert({
+    await createMatricula({
       academia_id: academiaId,
       aluno_id: matAlunoId,
       plano_id: matPlanoId,
@@ -129,7 +147,7 @@ export default function PlanosPage() {
       data_vencimento: vencimento,
       valor_pago: matValorPago ? parseFloat(matValorPago) : null,
       observacoes: matObs || null,
-      status: 'ATIVO'
+      status: 'ATIVO',
     })
     setSavingMat(false)
     setShowMatriculaModal(false)
@@ -138,7 +156,7 @@ export default function PlanosPage() {
   }
 
   const handleStatusChange = async (id: string, status: string) => {
-    await supabase.from('matriculas').update({ status }).eq('id', id)
+    await updateMatriculaStatus(id, status as Matricula['status'])
     fetchAll()
   }
 

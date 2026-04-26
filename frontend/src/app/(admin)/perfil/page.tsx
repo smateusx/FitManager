@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { updatePassword } from 'firebase/auth'
 import { getFirebaseAuth, getFirebaseCurrentUser } from '@/lib/firebase'
+import { getPerfilById, updatePerfil } from '@/lib/firestore-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,13 +34,8 @@ export default function PerfilPage() {
 
       setUser(currentUser)
 
-      const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', currentUser.uid)
-        .single()
-
-      if (error) throw error
+      const data = await getPerfilById(currentUser.uid)
+      if (!data) throw new Error('Perfil não encontrado')
       
       setPerfil(data)
       setNome(data.nome_completo || '')
@@ -58,15 +53,10 @@ export default function PerfilPage() {
     setSuccess(null)
 
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({
-          nome_completo: nome,
-          telefone: telefone
-        })
-        .eq('id', user.uid)
-
-      if (error) throw error
+      await updatePerfil(user.uid, {
+        nome_completo: nome,
+        telefone,
+      })
       
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
@@ -103,12 +93,7 @@ export default function PerfilPage() {
 
   async function handleAvatarUpload(url: string) {
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({ avatar_url: url })
-        .eq('id', user.uid)
-
-      if (error) throw error
+      await updatePerfil(user.uid, { avatar_url: url })
       
       setPerfil({ ...perfil, avatar_url: url })
       setSuccess('Foto de perfil atualizada!')

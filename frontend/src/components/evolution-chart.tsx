@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { listRegistrosCarga } from '@/lib/firestore-service'
 import { 
   LineChart, 
   Line, 
@@ -17,36 +17,33 @@ type Props = {
   alunoId: string
 }
 
-type Registro = {
+type RegistroCargaPoint = {
   data_registro: string
   carga: number
   repeticoes: number
+  data: string
 }
 
 export function EvolutionChart({ exercicioId, alunoId }: Props) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<RegistroCargaPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: registros, error } = await supabase
-        .from('registros_carga')
-        .select('data_registro, carga, repeticoes')
-        .eq('exercicio_id', exercicioId)
-        .eq('aluno_id', alunoId)
-        .order('data_registro', { ascending: true })
-
-      if (error) {
-        console.error('Erro ao buscar evolução:', error)
-      } else {
-        const formatted = (registros || []).map(r => ({
+      try {
+        const registros = await listRegistrosCarga(alunoId, exercicioId)
+        const formatted = (registros || []).map((r) => ({
           ...r,
           data: new Date(r.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-          carga: Number(r.carga)
+          carga: Number(r.carga),
         }))
         setData(formatted)
+      } catch (error) {
+        console.error('Erro ao buscar evolução:', error)
+        setData([])
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     fetchData()

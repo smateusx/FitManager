@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { listRevenueLastMonths } from '@/lib/firestore-service'
 import { 
   BarChart, 
   Bar, 
@@ -16,56 +16,31 @@ import {
 export function RevenueChart() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
-      // Buscar matrículas dos últimos 6 meses que tenham valor_pago
-      const sixMonthsAgo = new Date()
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5)
-      sixMonthsAgo.setDate(1)
-
-      const { data: matriculas, error } = await supabase
-        .from('matriculas')
-        .select('data_inicio, valor_pago')
-        .not('valor_pago', 'is', null)
-        .gte('data_inicio', sixMonthsAgo.toISOString().split('T')[0])
-
-      if (error) {
-        console.error('Erro ao buscar dados financeiros:', error)
-      } else {
-        // Agrupar por mês
-        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-        const grouped: Record<string, number> = {}
-
-        // Inicializar os últimos 6 meses com zero
-        for (let i = 0; i < 6; i++) {
-          const d = new Date()
-          d.setMonth(d.getMonth() - i)
-          const key = `${months[d.getMonth()]}/${d.getFullYear().toString().slice(-2)}`
-          grouped[key] = 0
+      try {
+        const academyId = localStorage.getItem('fm_academia_id')
+        if (!academyId) {
+          setError('Academia não identificada para gerar relatório.')
+          return
         }
-
-        (matriculas || []).forEach(m => {
-          const date = new Date(m.data_inicio + 'T12:00:00')
-          const key = `${months[date.getMonth()]}/${date.getFullYear().toString().slice(-2)}`
-          if (grouped[key] !== undefined) {
-            grouped[key] += Number(m.valor_pago)
-          }
-        })
-
-        const formatted = Object.entries(grouped)
-          .map(([name, total]) => ({ name, total }))
-          .reverse() // Do mais antigo para o mais novo
-
-        setData(formatted)
+        const revenue = await listRevenueLastMonths(academyId)
+        setData(revenue)
+      } catch (err) {
+        console.error('Erro ao buscar dados financeiros:', err)
+        setError('Erro ao carregar faturamento.')
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     fetchData()
   }, [])
 
   if (loading) return <div className="h-60 flex items-center justify-center text-[#A6A6A6] text-xs">Carregando dados financeiros...</div>
+  if (error) return <div className="h-60 flex items-center justify-center text-red-400 text-xs">{error}</div>
   if (data.length === 0) return <div className="h-60 flex items-center justify-center text-[#585759] text-xs">Sem dados financeiros no período.</div>
 
   return (

@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { signOut } from 'firebase/auth'
 import { getFirebaseAuth, getFirebaseCurrentUser } from '@/lib/firebase'
+import {
+  addRegistroCarga,
+  getPerfilById,
+  listFichasByAluno,
+  listMatriculasByAlunoWithDetails,
+} from '@/lib/firestore-service'
 import { 
   Dumbbell, 
   ChevronDown, 
@@ -67,36 +72,23 @@ export default function MeuTreinoPage() {
       }
 
       // Buscar perfil para pegar nome e academia_id
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', currentUser.uid)
-        .single()
+      const perfil = await getPerfilById(currentUser.uid)
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
-        setUserAvatar(perfil.avatar_url)
+        setUserAvatar(perfil.avatar_url ?? null)
         setUserId(currentUser.uid)
         setPerfilData(perfil)
       }
 
       // Buscar as fichas de treino do aluno
-      const { data: fichasData } = await supabase
-        .from('fichas_treino')
-        .select('*, exercicios(*)')
-        .eq('aluno_id', currentUser.uid)
-        .order('criado_em', { ascending: false })
+      const [fichasData, matriculasData] = await Promise.all([
+        listFichasByAluno(currentUser.uid),
+        listMatriculasByAlunoWithDetails(currentUser.uid),
+      ])
 
-      setFichas((fichasData as any) ?? [])
-
-      // Buscar histórico de matrículas
-      const { data: matriculasData } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor, duracao_dias)')
-        .eq('aluno_id', currentUser.uid)
-        .order('data_vencimento', { ascending: false })
-
-      setMatriculas(matriculasData || [])
+      setFichas(fichasData as any)
+      setMatriculas(matriculasData)
       setLoading(false)
     }
 
@@ -113,17 +105,12 @@ export default function MeuTreinoPage() {
     
     setIsSaving(true)
     try {
-      const { error } = await supabase
-        .from('registros_carga')
-        .insert({
-          aluno_id: userId,
-          exercicio_id: ex.id,
-          carga: cargaValue,
-          repeticoes: parseInt(repsValue),
-          data_registro: new Date().toISOString()
-        })
-
-      if (error) throw error
+      await addRegistroCarga({
+        aluno_id: userId,
+        exercicio_id: ex.id,
+        carga: cargaValue,
+        repeticoes: parseInt(repsValue),
+      })
       
       setRegisteringId(null)
       setCargaValue('')

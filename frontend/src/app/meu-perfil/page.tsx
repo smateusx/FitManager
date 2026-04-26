@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getPerfilById, updatePerfil } from '@/lib/firestore-service'
 import { getFirebaseCurrentUser, getFirebaseAuth } from '@/lib/firebase'
 import { signOut, updatePassword } from 'firebase/auth'
 import { Button } from '@/components/ui/button'
@@ -47,17 +47,12 @@ export default function AlunoPerfilPage() {
 
       setUser(firebaseUser)
 
-      const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', firebaseUser.uid)
-        .single()
-
-      if (error) throw error
+      const perfilData = await getPerfilById(firebaseUser.uid)
+      if (!perfilData) throw new Error('Perfil não encontrado')
       
-      setPerfil(data)
-      setNome(data.nome_completo || '')
-      setTelefone(data.telefone || '')
+      setPerfil(perfilData)
+      setNome(perfilData.nome_completo || '')
+      setTelefone(perfilData.telefone || '')
     } catch (err) {
       console.error('Erro ao carregar perfil:', err)
     } finally {
@@ -71,15 +66,10 @@ export default function AlunoPerfilPage() {
     setSuccess(null)
 
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({
-          nome_completo: nome,
-          telefone: telefone
-        })
-        .eq('id', user.uid)
-
-      if (error) throw error
+      await updatePerfil(user.uid, {
+        nome_completo: nome,
+        telefone: telefone
+      })
       
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
@@ -118,12 +108,7 @@ export default function AlunoPerfilPage() {
 
   async function handleAvatarUpload(url: string) {
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({ avatar_url: url })
-        .eq('id', user.uid)
-
-      if (error) throw error
+      await updatePerfil(user.uid, { avatar_url: url })
       
       setPerfil({ ...perfil, avatar_url: url })
       setSuccess('Foto de perfil atualizada!')

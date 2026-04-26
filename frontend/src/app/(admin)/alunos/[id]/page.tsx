@@ -2,7 +2,14 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import {
+  createMatricula,
+  deleteAlunoCascade,
+  getPerfilById,
+  listFichasByAluno,
+  listMatriculasByAlunoWithDetails,
+  listPlanosByAcademia,
+} from '@/lib/firestore-service'
 import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -89,14 +96,9 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       if (!user) { router.push('/login'); return }
 
       // 1. Buscar dados básicos do aluno
-      const { data: alunoData, error: alunoErr } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', alunoId)
-        .single()
-
-      if (alunoErr || !alunoData) {
-        console.error('Erro ao buscar aluno:', alunoErr)
+      const alunoData = await getPerfilById(alunoId)
+      if (!alunoData) {
+        console.error('Erro ao buscar aluno:', alunoId)
         router.push('/alunos')
         return
       }
@@ -104,31 +106,19 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       setAluno(alunoData as AlunoDetail)
 
       // 2. Buscar fichas de treino
-      const { data: fichasData } = await supabase
-        .from('fichas_treino')
-        .select('*, exercicios(*)')
-        .eq('aluno_id', alunoId)
-        .order('criado_em', { ascending: false })
-
+      const fichasData = await listFichasByAluno(alunoId)
       setFichas((fichasData as Ficha[]) ?? [])
 
       // 3. Buscar histórico financeiro/matrículas
-      const { data: matriculasData } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor)')
-        .eq('aluno_id', alunoId)
-        .order('data_vencimento', { ascending: false })
-
+      const matriculasData = await listMatriculasByAlunoWithDetails(alunoId)
       setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
       
       // 4. Buscar planos disponíveis para renovação
-      const { data: planosData } = await supabase
-        .from('planos')
-        .select('*')
-        .eq('ativo', true)
-        .order('valor')
-      
-      setPlanos(planosData || [])
+      const planosData = await listPlanosByAcademia(
+        (alunoData.academia_id as string) || '',
+        true
+      )
+      setPlanos(planosData)
       
       setLoading(false)
     }
@@ -147,28 +137,19 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       const dataVencimento = new Date(dataInicio)
       dataVencimento.setDate(dataVencimento.getDate() + (plano?.duracao_dias || 30))
 
-      const { error } = await supabase
-        .from('matriculas')
-        .insert({
-          academia_id: aluno.academia_id,
-          aluno_id: alunoId,
-          plano_id: selectedPlanoId,
-          data_inicio: renewDate,
-          data_vencimento: dataVencimento.toISOString().split('T')[0],
-          valor_pago: parseFloat(renewValor) || plano?.valor,
-          status: 'ATIVO'
-        })
-
-      if (error) throw error
+      await createMatricula({
+        academia_id: aluno.academia_id,
+        aluno_id: alunoId,
+        plano_id: selectedPlanoId,
+        data_inicio: renewDate,
+        data_vencimento: dataVencimento.toISOString().split('T')[0],
+        valor_pago: parseFloat(renewValor) || plano?.valor || null,
+        status: 'ATIVO',
+      })
 
       setShowRenewModal(false)
       // Atualizar lista de matrículas
-      const { data: updatedMatriculas } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor)')
-        .eq('aluno_id', alunoId)
-        .order('data_vencimento', { ascending: false })
-      
+      const updatedMatriculas = await listMatriculasByAlunoWithDetails(alunoId)
       setMatriculas((updatedMatriculas as unknown as Matricula[]) ?? [])
       alert('Matrícula renovada com sucesso!')
     } catch (err) {
@@ -184,8 +165,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
     if (!confirm('TEM CERTEZA? Isso excluirá permanentemente o aluno, suas matrículas e treinos.')) return
     
     try {
-      const { error } = await supabase.from('perfis').delete().eq('id', alunoId)
-      if (error) throw error
+      await deleteAlunoCascade(alunoId)
       alert('Aluno excluído com sucesso.')
       router.push('/alunos')
     } catch (err) {
