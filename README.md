@@ -19,4 +19,5 @@ SaaS voltado para academias de pequeno e médio porte, com foco no mercado brasi
 
 ## Qualidade e CI
 * Workflow: `.github/workflows/ci.yml`
-* Branch protection recomendada: `.github/BRANCH_PROTECTION_RECOMMENDED.md`
+* Branch protection recomendada: `docs/BRANCH_PROTECTION.md`
+* Checklist pós-merge/release: `docs/POST_MERGE_CHECKLIST.md`
