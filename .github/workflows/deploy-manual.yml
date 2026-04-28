@@ -10,6 +10,15 @@ on:
         options:
           - staging
           - production
+      provider:
+        description: "Deployment provider to use when deploy_command is empty"
+        required: true
+        type: choice
+        default: none
+        options:
+          - none
+          - vercel
+          - render
       deploy_command:
         description: "Optional deploy command (e.g. npm run deploy:prod)"
         required: false
@@ -88,14 +97,58 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Execute deploy command
         if: ${{ inputs.deploy_command != '' }}
         run: ${{ inputs.deploy_command }}
         shell: bash
 
-      - name: Skip deploy command
-        if: ${{ inputs.deploy_command == '' }}
-        run: echo "No deploy command provided. Running smoke checks only."
+      - name: Deploy frontend to Vercel
+        if: ${{ inputs.deploy_command == '' && inputs.provider == 'vercel' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${VERCEL_TOKEN}" ]; then
+            echo "::error::Missing VERCEL_TOKEN secret in the selected environment."
+            exit 1
+          fi
+
+          npm ci --prefix frontend
+
+          DEPLOY_FLAGS=""
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            DEPLOY_FLAGS="--prod"
+          fi
+
+          npx --yes vercel deploy --cwd frontend --yes --token "${VERCEL_TOKEN}" ${DEPLOY_FLAGS}
+
+      - name: Trigger Render deploy hook
+        if: ${{ inputs.deploy_command == '' && inputs.provider == 'render' }}
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ inputs.environment == 'production' && secrets.RENDER_DEPLOY_HOOK_PRODUCTION || secrets.RENDER_DEPLOY_HOOK_STAGING }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${RENDER_DEPLOY_HOOK_URL}" ]; then
+            echo "::error::Missing Render deploy hook secret for ${{ inputs.environment }} environment."
+            echo "Expected secret: RENDER_DEPLOY_HOOK_PRODUCTION or RENDER_DEPLOY_HOOK_STAGING."
+            exit 1
+          fi
+
+          curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}" >/dev/null
+          echo "Render deploy hook triggered."
+
+      - name: Skip deploy execution
+        if: ${{ inputs.deploy_command == '' && inputs.provider == 'none' }}
+        run: echo "No deploy provider/command selected. Running smoke checks only."
 
       - name: Smoke check backend health endpoint
         run: |
