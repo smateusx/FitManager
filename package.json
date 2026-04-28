@@ -1,0 +1,9 @@
+{
+  "name": "fitmanager",
+  "private": true,
+  "description": "Root package so Render can run npm start from repo root (delegates to backend/).",
+  "scripts": {
+    "postinstall": "npm install --prefix backend",
+    "start": "npm start --prefix backend"
+  }
+}
