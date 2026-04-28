@@ -19,6 +19,12 @@ on:
           - none
           - vercel
           - render
+          - mixed
+      vercel_project_path:
+        description: "Path for Vercel project (default: frontend)"
+        required: false
+        default: frontend
+        type: string
       deploy_command:
         description: "Optional deploy command (e.g. npm run deploy:prod)"
         required: false
@@ -110,28 +116,49 @@ jobs:
         shell: bash
 
       - name: Deploy frontend to Vercel
-        if: ${{ inputs.deploy_command == '' && inputs.provider == 'vercel' }}
+        if: ${{ inputs.deploy_command == '' && (inputs.provider == 'vercel' || inputs.provider == 'mixed') }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           set -euo pipefail
 
-          if [ -z "${VERCEL_TOKEN}" ]; then
-            echo "::error::Missing VERCEL_TOKEN secret in the selected environment."
+          if [ -z "${VERCEL_TOKEN}" ] || [ -z "${VERCEL_ORG_ID}" ] || [ -z "${VERCEL_PROJECT_ID}" ]; then
+            echo "::error::Missing Vercel secrets in the selected environment."
+            echo "Expected: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID."
             exit 1
           fi
 
-          npm ci --prefix frontend
+          npm ci --prefix "${{ inputs.vercel_project_path }}"
 
-          DEPLOY_FLAGS=""
           if [ "${{ inputs.environment }}" = "production" ]; then
-            DEPLOY_FLAGS="--prod"
+            VERCEL_ENVIRONMENT=production
+          else
+            VERCEL_ENVIRONMENT=preview
           fi
 
-          npx --yes vercel deploy --cwd frontend --yes --token "${VERCEL_TOKEN}" ${DEPLOY_FLAGS}
+          npx --yes vercel pull \
+            --cwd "${{ inputs.vercel_project_path }}" \
+            --yes \
+            --environment="${VERCEL_ENVIRONMENT}" \
+            --token "${VERCEL_TOKEN}"
+
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            npx --yes vercel deploy \
+              --cwd "${{ inputs.vercel_project_path }}" \
+              --prod \
+              --yes \
+              --token "${VERCEL_TOKEN}"
+          else
+            npx --yes vercel deploy \
+              --cwd "${{ inputs.vercel_project_path }}" \
+              --yes \
+              --token "${VERCEL_TOKEN}"
+          fi
 
       - name: Trigger Render deploy hook
-        if: ${{ inputs.deploy_command == '' && inputs.provider == 'render' }}
+        if: ${{ inputs.deploy_command == '' && (inputs.provider == 'render' || inputs.provider == 'mixed') }}
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ inputs.environment == 'production' && secrets.RENDER_DEPLOY_HOOK_PRODUCTION || secrets.RENDER_DEPLOY_HOOK_STAGING }}
         run: |

@@ -67,12 +67,33 @@ Comportamento no workflow:
 
 Configure:
 
-- `RENDER_API_KEY`
-- `RENDER_SERVICE_ID`
+- `RENDER_DEPLOY_HOOK_STAGING`
+- `RENDER_DEPLOY_HOOK_PRODUCTION`
 
 Comportamento:
 
-- chama o endpoint da API do Render para criar deploy e aguarda até status `live`.
+- dispara o deploy hook correspondente ao `environment` selecionado.
+
+## Modo recomendado para FitManager (misto)
+
+Use este fluxo:
+
+- Frontend: **Vercel**
+- Backend: **Render**
+
+Como rodar no workflow:
+
+1. `provider`: `mixed_vercel_render`
+2. `environment`: `staging` (ou `production`)
+3. `backend_health_url`: URL pública do backend (`/health`)
+4. `frontend_url`: URL pública do frontend
+5. `deploy_command`: deixar vazio
+
+Esse modo executa:
+
+1. Deploy do frontend no Vercel
+2. Trigger de deploy do backend no Render
+3. Smoke checks de backend e frontend
 
 ## Recomendação de segurança
 

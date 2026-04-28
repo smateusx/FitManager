@@ -23,3 +23,4 @@ SaaS voltado para academias de pequeno e médio porte, com foco no mercado brasi
 * Branch protection recomendada: `docs/BRANCH_PROTECTION.md`
 * Runbook pós-merge/release: `docs/POST_MERGE_RUNBOOK.md`
 * Guia de deploy manual: `docs/DEPLOY_MANUAL.md`
+* Padrão recomendado de deploy: frontend no Vercel + backend no Render (misto)
