@@ -1,13 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/use-auth'
+import {
+  createFichaWithExercises,
+  deleteFichaCascade,
+  getPerfilById,
+  listAlunosByAcademia,
+  listFichasByAcademiaWithDetails,
+} from '@/lib/firestore-service'
 
 type Exercicio = {
   id?: string
@@ -36,7 +43,7 @@ type AlunoOption = {
 const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10-12', carga: '', descanso: '60s' }
 
 export default function TreinosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [alunos, setAlunos] = useState<AlunoOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,33 +60,32 @@ export default function TreinosPage() {
 
   const router = useRouter()
 
-  useEffect(() => { 
-    if (authLoading) return
-    fetchAll() 
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    const firebaseUser = await getFirebaseCurrentUser()
+    if (!firebaseUser) { router.push('/login'); return }
 
-    const { data: profile } = await supabase.from('perfis').select('academia_id').eq('id', session.user.id).single()
-    if (profile) setAcademiaId(profile.academia_id)
+    const profileData = await getPerfilById(firebaseUser.uid)
+    if (!profileData?.academia_id) {
+      setLoading(false)
+      return
+    }
+    setAcademiaId(profileData.academia_id)
 
-    const { data: fichasData } = await supabase
-      .from('fichas_treino')
-      .select('*, perfis(nome_completo), exercicios(*)')
-      .order('criado_em', { ascending: false })
-
-    const { data: alunosData } = await supabase
-      .from('perfis')
-      .select('id, nome_completo')
-      .eq('role', 'ALUNO')
+    const [fichasData, alunosData] = await Promise.all([
+      listFichasByAcademiaWithDetails(profileData.academia_id),
+      listAlunosByAcademia(profileData.academia_id),
+    ])
 
     setFichas((fichasData as Ficha[]) ?? [])
-    setAlunos((alunosData as AlunoOption[]) ?? [])
+    setAlunos(
+      (alunosData as AlunoOption[]).map((aluno) => ({
+        id: aluno.id,
+        nome_completo: aluno.nome_completo,
+      }))
+    )
     setLoading(false)
-  }
+  }, [router])
 
   const addExercicio = () => setExercicios(prev => [...prev, { ...BLANK_EXERCICIO }])
   const removeExercicio = (i: number) => setExercicios(prev => prev.filter((_, idx) => idx !== i))
@@ -92,23 +98,28 @@ export default function TreinosPage() {
     if (!academiaId || !alunoSel || isReceptionist) return
     setSaving(true)
 
-    const { data: fichaData, error: fichaErr } = await supabase
-      .from('fichas_treino')
-      .insert({ nome: nomeFicha, objetivo, aluno_id: alunoSel, academia_id: academiaId })
-      .select().single()
-
-    if (fichaErr || !fichaData) {
-      alert('Erro ao criar ficha: ' + fichaErr?.message)
+    try {
+      await createFichaWithExercises({
+        academia_id: academiaId,
+        aluno_id: alunoSel,
+        nome: nomeFicha,
+        objetivo,
+        exercicios: exercicios
+          .filter(ex => ex.nome.trim())
+          .map((ex, i) => ({
+            nome: ex.nome,
+            series: ex.series,
+            repeticoes: ex.repeticoes,
+            carga: ex.carga,
+            descanso: ex.descanso,
+            ordem: i,
+          })),
+      })
+    } catch (error) {
+      console.error('Erro ao criar ficha:', error)
+      alert('Erro ao criar ficha de treino.')
       setSaving(false)
       return
-    }
-
-    const exRows = exercicios
-      .filter(ex => ex.nome.trim())
-      .map((ex, i) => ({ ...ex, ficha_id: fichaData.id, ordem: i }))
-
-    if (exRows.length > 0) {
-      await supabase.from('exercicios').insert(exRows)
     }
 
     setSaving(false)
@@ -120,7 +131,7 @@ export default function TreinosPage() {
   const handleDelete = async (id: string) => {
     if (isReceptionist) return
     if (!confirm('Tem certeza que deseja excluir esta ficha?')) return
-    await supabase.from('fichas_treino').delete().eq('id', id)
+    await deleteFichaCascade(id)
     fetchAll()
   }
 
@@ -128,6 +139,13 @@ export default function TreinosPage() {
     setNomeFicha(''); setObjetivo(''); setAlunoSel('')
     setExercicios([{ ...BLANK_EXERCICIO }])
   }
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAll()
+    })
+  }, [authLoading, fetchAll])
 
   return (
     <div className="p-8">
@@ -156,7 +174,7 @@ export default function TreinosPage() {
               </div>
               <p className="text-white font-semibold text-lg">Nenhuma ficha cadastrada ainda</p>
               {!isReceptionist && (
-                <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em "Nova Ficha" para montar o primeiro treino de um aluno.</p>
+                <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em &quot;Nova Ficha&quot; para montar o primeiro treino de um aluno.</p>
               )}
             </div>
           ) : (

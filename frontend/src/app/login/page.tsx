@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { getFirebaseAuth } from '@/lib/firebase'
+import { signInWithEmailAndPassword } from 'firebase/auth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -20,15 +21,15 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setErrorMsg('')
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setErrorMsg('E-mail ou senha incorretos. Tente novamente.')
-      setLoading(false)
-    } else {
+    try {
+      const auth = getFirebaseAuth()
+      await signInWithEmailAndPassword(auth, email, password)
       // Dashboard page handles role-based routing (admin vs aluno)
       router.push('/dashboard')
+    } catch {
+      setErrorMsg('E-mail ou senha incorretos. Tente novamente.')
+    } finally {
+      setLoading(false)
     }
   }
 

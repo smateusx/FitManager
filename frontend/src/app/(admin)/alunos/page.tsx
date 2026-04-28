@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
+import { getPerfilById, listAlunosByAcademia } from '@/lib/firestore-service'
 import { Copy, X, CheckCircle2, ChevronRight } from 'lucide-react'
 
 type Aluno = {
@@ -17,7 +18,7 @@ type Aluno = {
 import { useAuth } from '@/hooks/use-auth'
 
 export default function AlunosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading } = useAuth()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [loading, setLoading] = useState(true)
   const [academiaId, setAcademiaId] = useState<string | null>(null)
@@ -26,42 +27,42 @@ export default function AlunosPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (authLoading) return
-    fetchAlunos()
-  }, [authLoading])
-
   const fetchAlunos = async () => {
     setLoading(true)
     
     // 1. Get current admin session
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    const currentUser = await getFirebaseCurrentUser()
+    if (!currentUser) return
     
     // 2. Get academia_id of the admin to build the invite link
-    const { data: adminProfile } = await supabase
-      .from('perfis')
-      .select('academia_id')
-      .eq('id', session.user.id)
-      .single()
+    const adminProfile = await getPerfilById(currentUser.uid)
       
     if (adminProfile) {
       setAcademiaId(adminProfile.academia_id)
     }
 
     // 3. Get all students (RLS automatically filters by your academia)
-    const { data: alunosData } = await supabase
-      .from('perfis')
-      .select('*')
-      .eq('role', 'ALUNO')
-      .order('created_at', { ascending: false })
-
-    if (alunosData) {
-      setAlunos(alunosData as Aluno[])
+    if (adminProfile?.academia_id) {
+      const alunosData = await listAlunosByAcademia(adminProfile.academia_id)
+      setAlunos(
+        alunosData.map((aluno) => ({
+          id: aluno.id,
+          nome_completo: aluno.nome_completo || '',
+          telefone: aluno.telefone || null,
+          created_at: aluno.created_at || new Date().toISOString(),
+        }))
+      )
     }
     
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAlunos()
+    })
+  }, [authLoading])
 
   const inviteLink = academiaId 
     ? `${window.location.origin}/register/aluno?academia_id=${academiaId}`
@@ -110,7 +111,7 @@ export default function AlunosPage() {
                 ) : alunos.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center text-[#A6A6A6]">
-                      Nenhum aluno encontrado. Clique em "Convidar Aluno" para começar.
+                      Nenhum aluno encontrado. Clique em &quot;Convidar Aluno&quot; para começar.
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { supabase } from '@/lib/supabase'
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import { collection, addDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { getFirebaseAuth, getFirebaseDb } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -15,48 +17,46 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
-    // 1. Criar a conta de autenticação (Gatilho fará ele nascer como ALUNO com academia_id null)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { nome_completo: fullName } }
-    })
+    setErrorMsg('')
 
-    if (authError) {
-      alert('Erro ao criar conta: ' + authError.message)
-      setLoading(false)
-      return
-    }
+    try {
+      const auth = getFirebaseAuth()
+      const db = getFirebaseDb()
 
-    // Como no Supabase o login automático acontece após o signup, o usuário já estará "logado" nesta sessão.
-    // 2. Criar a academia no banco de dados
-    const { data: gymData, error: gymError } = await supabase
-      .from('academias')
-      .insert({ nome: gymName })
-      .select()
-      .single()
+      const credential = await createUserWithEmailAndPassword(auth, email, password)
+      const firebaseUser = credential.user
 
-    if (gymError) {
-      console.error('Gatilho/RLS Error:', gymError)
-      alert('Erro (Acesso DB): ' + gymError.message)
-    } else if (gymData && authData.user) {
-      // 3. Elevar os privilégios do usuário recém-criado para ADMIN da sua própria academia
-      await supabase.from('perfis').update({
-        academia_id: gymData.id,
-        role: 'ADMIN'
-      }).eq('id', authData.user.id)
-      
+      await updateProfile(firebaseUser, { displayName: fullName })
+
+      const academiaRef = await addDoc(collection(db, 'academias'), {
+        nome: gymName,
+        created_at: serverTimestamp(),
+      })
+
+      await setDoc(doc(db, 'perfis', firebaseUser.uid), {
+        id: firebaseUser.uid,
+        academia_id: academiaRef.id,
+        role: 'ADMIN',
+        nome_completo: fullName,
+        telefone: null,
+        avatar_url: null,
+        created_at: serverTimestamp(),
+      })
+
       alert('Conta de academia criada com sucesso!')
       router.push('/dashboard')
+    } catch (error) {
+      console.error('Erro ao criar conta de academia:', error)
+      setErrorMsg('Erro ao criar conta. Verifique os dados e tente novamente.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
@@ -79,6 +79,11 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-5">
+            {errorMsg && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                {errorMsg}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="gymName" className="text-[#A6A6A6]">Nome da Academia</Label>
               <Input 

@@ -1,7 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import {
+  getPerfilById,
+  listVencimentosProximos,
+} from '@/lib/firestore-service'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { 
   Search, 
@@ -10,7 +14,6 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Clock,
-  ExternalLink,
   Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -38,12 +41,19 @@ export default function CobrancasPage() {
   async function fetchVencimentos() {
     try {
       setLoading(true)
-      // Buscando da view que criamos
-      const { data, error } = await supabase
-        .from('vencimentos_proximos')
-        .select('*')
+      const currentUser = await getFirebaseCurrentUser()
+      if (!currentUser) {
+        setVencimentos([])
+        return
+      }
 
-      if (error) throw error
+      const perfil = await getPerfilById(currentUser.uid)
+      if (!perfil?.academia_id) {
+        setVencimentos([])
+        return
+      }
+
+      const data = await listVencimentosProximos(perfil.academia_id)
       setVencimentos(data || [])
     } catch (err) {
       console.error('Erro ao buscar vencimentos:', err)
@@ -63,11 +73,14 @@ export default function CobrancasPage() {
       return
     }
 
+    const billingStatus =
+      v.status_vencimento === 'EM_DIA' ? 'VENCENDO_EM_BREVE' : v.status_vencimento
+
     const mensagem = WhatsAppService.getBillingMessage(
       v.aluno_nome,
       v.plano_nome,
       v.data_vencimento,
-      v.status_vencimento as any
+      billingStatus
     )
 
     const link = WhatsAppService.getLink(v.aluno_telefone, mensagem)

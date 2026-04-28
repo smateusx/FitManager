@@ -1,31 +1,37 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getPerfilById, updatePerfil } from '@/lib/firestore-service'
+import { getFirebaseCurrentUser, getFirebaseAuth } from '@/lib/firebase'
+import { signOut, updatePassword } from 'firebase/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AvatarUpload } from '@/components/avatar-upload'
 import { 
-  Dumbbell, 
   User, 
   Lock, 
-  Save, 
   Loader2, 
   CheckCircle2, 
   ChevronLeft,
   Smartphone,
   LogOut
 } from 'lucide-react'
+import type { Perfil } from '@/lib/firestore-service'
+import type { User as FirebaseUser } from 'firebase/auth'
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'Erro desconhecido'
+}
 
 export default function AlunoPerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   
-  const [user, setUser] = useState<any>(null)
-  const [perfil, setPerfil] = useState<any>(null)
+  const [user, setUser] = useState<FirebaseUser | null>(null)
+  const [perfil, setPerfil] = useState<Perfil | null>(null)
   
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -34,55 +40,46 @@ export default function AlunoPerfilPage() {
 
   const router = useRouter()
 
-  useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  async function fetchProfile() {
+  const fetchProfile = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      const firebaseUser = await getFirebaseCurrentUser()
+      if (!firebaseUser) { router.push('/login'); return }
 
-      setUser(session.user)
+      setUser(firebaseUser)
 
-      const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-
-      if (error) throw error
+      const perfilData = await getPerfilById(firebaseUser.uid)
+      if (!perfilData) throw new Error('Perfil não encontrado')
       
-      setPerfil(data)
-      setNome(data.nome_completo || '')
-      setTelefone(data.telefone || '')
+      setPerfil(perfilData)
+      setNome(perfilData.nome_completo || '')
+      setTelefone(perfilData.telefone || '')
     } catch (err) {
       console.error('Erro ao carregar perfil:', err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    void fetchProfile()
+  }, [fetchProfile])
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
+    if (!user) return
     setSaving(true)
     setSuccess(null)
 
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({
-          nome_completo: nome,
-          telefone: telefone
-        })
-        .eq('id', user.id)
-
-      if (error) throw error
+      await updatePerfil(user.uid, {
+        nome_completo: nome,
+        telefone: telefone
+      })
       
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao atualizar perfil: ' + err.message)
+    } catch (err: unknown) {
+      alert('Erro ao atualizar perfil: ' + getErrorMessage(err))
     } finally {
       setSaving(false)
     }
@@ -97,37 +94,33 @@ export default function AlunoPerfilPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
-
-      if (error) throw error
+      const auth = getFirebaseAuth()
+      if (!auth.currentUser) {
+        throw new Error('Sessão expirada. Faça login novamente.')
+      }
+      await updatePassword(auth.currentUser, newPassword)
       
       setSuccess('Senha alterada com sucesso!')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao alterar senha: ' + err.message)
+    } catch (err: unknown) {
+      alert('Erro ao alterar senha: ' + getErrorMessage(err))
     } finally {
       setSaving(false)
     }
   }
 
   async function handleAvatarUpload(url: string) {
+    if (!user) return
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({ avatar_url: url })
-        .eq('id', user.id)
-
-      if (error) throw error
+      await updatePerfil(user.uid, { avatar_url: url })
       
-      setPerfil({ ...perfil, avatar_url: url })
+      setPerfil((prev) => (prev ? { ...prev, avatar_url: url } : prev))
       setSuccess('Foto de perfil atualizada!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao salvar URL do avatar: ' + err.message)
+    } catch (err: unknown) {
+      alert('Erro ao salvar URL do avatar: ' + getErrorMessage(err))
     }
   }
 
@@ -154,7 +147,7 @@ export default function AlunoPerfilPage() {
 
           <button 
             onClick={async () => {
-              await supabase.auth.signOut()
+              await signOut(getFirebaseAuth())
               router.push('/login')
             }}
             className="p-2 text-[#A6A6A6] hover:text-red-500 rounded-xl transition-all"
@@ -181,11 +174,13 @@ export default function AlunoPerfilPage() {
           {/* Avatar Section */}
           <div className="lg:col-span-1">
             <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl">
-              <AvatarUpload 
-                uid={user?.id} 
-                url={perfil?.avatar_url} 
-                onUpload={handleAvatarUpload} 
-              />
+              {user && (
+                <AvatarUpload 
+                  uid={user.uid} 
+                  url={perfil?.avatar_url ?? null} 
+                  onUpload={handleAvatarUpload} 
+                />
+              )}
               
               <div className="mt-8 space-y-4">
                 <div className="p-4 bg-[#585759]/5 rounded-2xl border border-[#585759]/10">

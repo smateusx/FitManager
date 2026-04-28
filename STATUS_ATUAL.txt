@@ -1,93 +1,56 @@
 ================================================================================
-# FITMANAGER SAAS - DOCUMENTO DE CONTEXTO E TRANSFERÊNCIA
+# FITMANAGER SAAS - STATUS DE CONTEXTO (ATUALIZADO)
 ================================================================================
 
-Este documento resume o estado atual do desenvolvimento do FitManager, um SaaS
-brasileiro para gestão de academias, para que outra IA possa retomar o trabalho
-com total clareza técnica e de produto.
+Resumo técnico para continuidade do FitManager após decisão de migração de
+Supabase para Firebase.
 
 --------------------------------------------------------------------------------
-1. TECH STACK & ARQUITETURA
+1. STACK E ARQUITETURA (ESTADO ATUAL)
 --------------------------------------------------------------------------------
-- Frontend: Next.js (App Router), Tailwind CSS (v4), Lucid React (ícones), Shadcn UI.
-- Backend: Node.js (Express) com TypeScript (rodando atualmente via ts-node).
-- Banco de Dados & Auth: Supabase (PostgreSQL + RLS).
-- Repositório Git: git@github.com:smateusx/FitManager.git (Branch: main).
-
---------------------------------------------------------------------------------
-2. O QUE JÁ FOI IMPLEMENTADO (STATUS: FUNCIONAL)
---------------------------------------------------------------------------------
-- AUTENTICAÇÃO:
-    - Login e Registro de Academia (Admin).
-    - Redirecionamento inteligente por papel (Role): 
-        - Admin/Recepcionista -> /dashboard
-        - Aluno -> /meu-treino
-    - Correção de bugs de confirmação de e-mail e RLS recursiva.
-
-- DASHBOARD ADMINISTRATIVO:
-    - Estatísticas reais puxadas do Supabase (Total de alunos, Planos ativos, Fichas de treino, Alunos sem ficha).
-    - Layout premium (Dark Mode: #0D0D0D, Primary: #F2B705).
-
-- GESTÃO DE ALUNOS:
-    - Listagem dinâmica de alunos vinculados à academia logada.
-    - Sistema de Convite Scalable: Admin gera link único -> Aluno se cadastra -> Automaticamente vinculado à academia via URL (academia_id).
-
-- GESTÃO DE TREINOS:
-    - CRUD completo de Fichas de Treino.
-    - Construtor dinâmico de exercícios (Séries, Reps, Carga, Descanso).
-    - Visual de acordeão para expansão de treinos.
-
-- PORTAL DO ALUNO (/meu-treino):
-    - Área restrita para o aluno ver suas próprias fichas de treino e exercícios.
-    - [NOVO] Aba "Matrícula" com transparência total de pagamentos, plano atual e histórico.
-    - [NOVO] Integração com WhatsApp para suporte direto.
-
-- PLANOS & PAGAMENTOS:
-    - Cadastro de planos (nome, valor, duração).
-    - Matrícula de alunos em planos com cálculo automático de data de vencimento.
-    - Destaque visual (vermelho) para planos que vencem nos próximos 7 dias.
-    - [NOVO] Central de Cobranças para Admin com notificações automáticas via WhatsApp (View `vencimentos_proximos`).
-
-- PÁGINA DE DETALHES DO ALUNO (Admin): 
-    - Criada /alunos/[id] com abas para Perfil, Histórico de Treinos, Financeiro e Evolução.
-    - Gráficos de evolução de força integrados (recharts).
-    - Botão de WhatsApp personalizado com cores e logo oficial (@v4).
-
-- EVOLUÇÃO DE CARGA (Aluno):
-    - Registro de peso e repetições direto no portal /meu-treino.
-    - Mini-gráficos de progresso acessíveis para o aluno.
-
-- EDITOR DE PERFIL:
-    - Página de configurações para Admin (/perfil) e Aluno (/meu-perfil).
-    - Upload de foto de perfil integrado ao Supabase Storage.
-    - Alteração de nome, telefone e senha.
+- Frontend: Next.js (App Router), Tailwind CSS v4, Shadcn UI.
+- Backend: Node.js (Express) com TypeScript (ts-node no dev).
+- Banco e Auth (decisão de produto): Firebase.
+- Repositório: git@github.com:smateusx/FitManager.git.
 
 --------------------------------------------------------------------------------
-3. CONFIGURAÇÕES CRÍTICAS DO SUPABASE (IMPORTANTE)
+2. SITUAÇÃO DA MIGRAÇÃO
 --------------------------------------------------------------------------------
-- TABELAS: academias, perfis, fichas_treino, exercicios, planos, matriculas.
-- VIEWS: `vencimentos_proximos` (base para cobranças).
-- TRIGGER EM auth.users: Ao criar usuário, insere automaticamente em public.perfis.
-    - O trigger lê 'nome_completo' e 'academia_id' do metadata do auth.signUp.
-- RLS (Row Level Security): Rigorosamente aplicado. O administrador só vê dados de sua academia. O aluno só vê seus próprios treinos e matrículas.
-- FIX RECURSÃO: Foi criada uma função `public.get_my_academia_id()` para evitar loops infinitos nas políticas de segurança da tabela 'perfis'.
+- A base funcional da aplicação ainda contém chamadas de Supabase no frontend.
+- O backend não depende mais do SDK do Supabase (dependência removida).
+- Foi adicionada uma base de cliente Firebase em `frontend/src/lib/firebase.ts`.
+- Existe um plano técnico em `MIGRATION_SUPABASE_TO_FIREBASE.md`.
 
 --------------------------------------------------------------------------------
-4. PRÓXIMOS PASSOS PROGRAMADOS (BACKLOG)
+3. O QUE CONTINUA VÁLIDO NO PRODUTO
 --------------------------------------------------------------------------------
-1. [PLANEJADO] RELATÓRIOS ADMINISTRATIVOS:
-   - Exportação de dados financeiros para PDF/Excel.
-   - Relatórios segmentados por plano e período.
+- Fluxos de negócio já desenhados:
+  - Autenticação por papel (ADMIN, RECEPCIONISTA, ALUNO)
+  - Gestão de alunos, treinos, planos, matrículas e cobranças
+  - Portal do aluno e recursos de evolução
+  - Relatórios PDF/Excel no dashboard
+- Integração de WhatsApp segue independente de provedor de banco/auth.
 
-2. [PLANEJADO] CONTROLE DE ACESSO (RBAC):
-   - Perfil de "Recepcionista" com permissões limitadas (sem acesso a dashboard financeiro total).
+--------------------------------------------------------------------------------
+4. PRÓXIMOS PASSOS PRIORITÁRIOS
+--------------------------------------------------------------------------------
+1. Migrar autenticação (`use-auth`, login, registro) para Firebase Auth.
+2. Migrar camada de dados das páginas admin/aluno para Firestore.
+3. Migrar upload de avatar para Firebase Storage.
+4. Converter scripts SQL legados para documentação de coleções/regras Firebase.
+5. Revisar lint/typecheck após migração dos módulos críticos.
 
 --------------------------------------------------------------------------------
-5. COMO RODAR O PROJETO
+5. COMO RODAR (ATÉ CONCLUSÃO DA MIGRAÇÃO)
 --------------------------------------------------------------------------------
-- Frontend: `cd frontend && npm run dev` (Porta 3000)
-- Backend: `cd backend && npx ts-node src/server.ts` (Porta 3001)
+- Frontend:
+  1) `cd frontend`
+  2) `cp .env.example .env.local`
+  3) preencher variáveis `NEXT_PUBLIC_FIREBASE_*`
+  4) `npm run dev`
+- Backend:
+  - `cd backend && npx ts-node src/server.ts`
 
 ================================================================================
-FIM DO DOCUMENTO - ÚLTIMO COMMIT: 50c2725
+FIM DO DOCUMENTO
 ================================================================================

@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { Users, Dumbbell, UserCheck, AlertTriangle, TrendingUp, CreditCard, Clock, FileDown, FileSpreadsheet } from 'lucide-react'
 import { RevenueChart } from '@/components/revenue-chart'
 import { ReportsService } from '@/lib/reports-service'
 import { useAuth } from '@/hooks/use-auth'
+import {
+  getDashboardSnapshot,
+  listMatriculasByAcademiaWithDetails,
+} from '@/lib/firestore-service'
 
 type Stats = {
   totalAlunos: number
@@ -44,80 +47,42 @@ export default function DashboardPage() {
     if (authLoading) return
 
     const loadDashboard = async () => {
-      // 1. Alunos e Treinos
-      const { count: totalAlunos } = await supabase
-        .from('perfis')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'ALUNO')
-
-      const { count: totalTreinos } = await supabase
-        .from('fichas_treino')
-        .select('*', { count: 'exact', head: true })
-
-      // 2. Financeiro (Mês Atual)
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      
-      const { data: matriculasMes } = await supabase
-        .from('matriculas')
-        .select('valor_pago, status, data_vencimento')
-        .gte('criado_em', startOfMonth)
-
-      const receita = (matriculasMes || [])
-        .filter(m => m.status === 'ATIVO' && m.valor_pago)
-        .reduce((sum, m) => sum + Number(m.valor_pago), 0)
-
-      const vencimentos = (matriculasMes || [])
-        .filter(m => m.status === 'VENCIDO')
-        .length
-
-      // 3. Atividades Recentes
-      const { data: recentData } = await supabase
-        .from('matriculas')
-        .select('id, valor_pago, criado_em, perfis(nome_completo), planos(nome)')
-        .order('criado_em', { ascending: false })
-        .limit(5)
-
-      const formattedActivities = (recentData || []).map((m: any) => ({
-        id: m.id,
-        aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
-        plano_nome: m.planos?.nome || 'Plano Personalizado',
-        valor: Number(m.valor_pago || 0),
-        data: m.criado_em
-      }))
+      if (!profile?.academia_id) {
+        setLoading(false)
+        return
+      }
+      const snapshot = await getDashboardSnapshot(profile.academia_id)
 
       setStats({
-        totalAlunos: totalAlunos ?? 0,
-        alunosAtivos: totalAlunos ?? 0, // Simplificação por enquanto
-        totalTreinos: totalTreinos ?? 0,
-        semTreino: Math.max(0, (totalAlunos ?? 0) - (totalTreinos ?? 0)),
-        receitaMensal: receita,
-        vencimentosMes: vencimentos
+        totalAlunos: snapshot.totalAlunos,
+        alunosAtivos: snapshot.totalAlunos, // Simplificação por enquanto
+        totalTreinos: snapshot.totalTreinos,
+        semTreino: Math.max(0, snapshot.totalAlunos - snapshot.totalTreinos),
+        receitaMensal: snapshot.receitaMensal,
+        vencimentosMes: snapshot.vencimentosMes,
       })
 
-      setRecentActivities(formattedActivities)
+      setRecentActivities(snapshot.recentActivities)
       setLoading(false)
     }
 
     loadDashboard()
-  }, [authLoading, router])
+  }, [authLoading, profile?.academia_id, router])
 
   const handleExportPDF = async () => {
     if (isReceptionist) return
     setIsExporting(true)
     try {
-      const { data: allMatriculas } = await supabase
-        .from('matriculas')
-        .select('id, valor_pago, criado_em, status, perfis(nome_completo), planos(nome)')
-        .order('criado_em', { ascending: false })
+      if (!profile?.academia_id) return
+      const allMatriculas = await listMatriculasByAcademiaWithDetails(profile.academia_id)
 
       const columns = ['Aluno', 'Plano', 'Valor', 'Data', 'Status']
-      const rows = (allMatriculas || []).map((m: any) => [
+      const rows = allMatriculas.map((m) => [
         m.perfis?.nome_completo || 'N/A',
         m.planos?.nome || 'Personalizado',
         `R$ ${Number(m.valor_pago || 0).toFixed(2)}`,
         new Date(m.criado_em).toLocaleDateString('pt-BR'),
-        m.status
+        m.status,
       ])
 
       ReportsService.exportToPDF(
@@ -135,16 +100,14 @@ export default function DashboardPage() {
     if (isReceptionist) return
     setIsExporting(true)
     try {
-      const { data: allMatriculas } = await supabase
-        .from('matriculas')
-        .select('valor_pago, criado_em, status, perfis(nome_completo), planos(nome)')
-      
-      const formattedData = (allMatriculas || []).map((m: any) => ({
+      if (!profile?.academia_id) return
+      const allMatriculas = await listMatriculasByAcademiaWithDetails(profile.academia_id)
+      const formattedData = allMatriculas.map((m) => ({
         'Aluno': m.perfis?.nome_completo,
         'Plano': m.planos?.nome,
         'Valor (R$)': Number(m.valor_pago || 0),
         'Data': new Date(m.criado_em).toLocaleDateString('pt-BR'),
-        'Status': m.status
+        'Status': m.status,
       }))
 
       ReportsService.exportToExcel(

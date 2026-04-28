@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { signOut } from 'firebase/auth'
+import { getFirebaseAuth, getFirebaseCurrentUser } from '@/lib/firebase'
+import {
+  addRegistroCarga,
+  type MatriculaWithDetails,
+  getPerfilById,
+  listFichasByAluno,
+  listMatriculasByAlunoWithDetails,
+} from '@/lib/firestore-service'
 import { 
   Dumbbell, 
   ChevronDown, 
@@ -18,6 +26,7 @@ import {
 } from 'lucide-react'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
+import Image from 'next/image'
 
 type Exercicio = {
   id: string
@@ -49,52 +58,37 @@ export default function MeuTreinoPage() {
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [perfilData, setPerfilData] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
-  const [matriculas, setMatriculas] = useState<any[]>([])
+  const [matriculas, setMatriculas] = useState<MatriculaWithDetails[]>([])
 
   const router = useRouter()
 
   useEffect(() => {
     async function loadData() {
-      const { data: { session } } = await supabase.auth.getSession()
+      const currentUser = await getFirebaseCurrentUser()
       
-      if (!session) {
+      if (!currentUser) {
         router.push('/login')
         return
       }
 
       // Buscar perfil para pegar nome e academia_id
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
+      const perfil = await getPerfilById(currentUser.uid)
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
-        setUserAvatar(perfil.avatar_url)
-        setUserId(session.user.id)
-        setPerfilData(perfil)
+        setUserAvatar(perfil.avatar_url ?? null)
+        setUserId(currentUser.uid)
       }
 
       // Buscar as fichas de treino do aluno
-      const { data: fichasData } = await supabase
-        .from('fichas_treino')
-        .select('*, exercicios(*)')
-        .eq('aluno_id', session.user.id)
-        .order('criado_em', { ascending: false })
+      const [fichasData, matriculasData] = await Promise.all([
+        listFichasByAluno(currentUser.uid),
+        listMatriculasByAlunoWithDetails(currentUser.uid),
+      ])
 
-      setFichas((fichasData as any) ?? [])
-
-      // Buscar histórico de matrículas
-      const { data: matriculasData } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor, duracao_dias)')
-        .eq('aluno_id', session.user.id)
-        .order('data_vencimento', { ascending: false })
-
-      setMatriculas(matriculasData || [])
+      setFichas(fichasData as Ficha[])
+      setMatriculas(matriculasData)
       setLoading(false)
     }
 
@@ -102,7 +96,7 @@ export default function MeuTreinoPage() {
   }, [router])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut(getFirebaseAuth())
     router.push('/login')
   }
 
@@ -111,17 +105,12 @@ export default function MeuTreinoPage() {
     
     setIsSaving(true)
     try {
-      const { error } = await supabase
-        .from('registros_carga')
-        .insert({
-          aluno_id: userId,
-          exercicio_id: ex.id,
-          carga: cargaValue,
-          repeticoes: parseInt(repsValue),
-          data_registro: new Date().toISOString()
-        })
-
-      if (error) throw error
+      await addRegistroCarga({
+        aluno_id: userId,
+        exercicio_id: ex.id,
+        carga: cargaValue,
+        repeticoes: parseInt(repsValue),
+      })
       
       setRegisteringId(null)
       setCargaValue('')
@@ -166,7 +155,14 @@ export default function MeuTreinoPage() {
             >
               <div className="w-8 h-8 rounded-full bg-[#585759]/20 flex items-center justify-center overflow-hidden border border-[#585759]/30 group-hover:border-[#F2B705]/50 transition-all">
                 {userAvatar ? (
-                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                  <Image
+                    src={userAvatar}
+                    alt={userName}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                    unoptimized
+                  />
                 ) : (
                   <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
                 )}

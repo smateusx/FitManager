@@ -1,8 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getFirebaseCurrentUser } from '@/lib/firebase'
+import {
+  createMatricula,
+  createPlano,
+  getPerfilById,
+  listAlunosByAcademia,
+  listMatriculasByAcademiaWithDetails,
+  listPlanosByAcademia,
+  updateMatriculaStatus,
+} from '@/lib/firestore-service'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,7 +48,7 @@ const STATUS_COLORS = {
 }
 
 export default function PlanosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [tab, setTab] = useState<'matriculas' | 'planos'>('matriculas')
   const [planos, setPlanos] = useState<Plano[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
@@ -65,31 +74,47 @@ export default function PlanosPage() {
   const [savingMat, setSavingMat] = useState(false)
 
   const router = useRouter()
+  const now = new Date()
+  const vencendoThreshold = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 7
+  )
 
-  useEffect(() => { 
-    if (authLoading) return
-    fetchAll() 
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    const firebaseUser = await getFirebaseCurrentUser()
+    if (!firebaseUser) { router.push('/login'); return }
 
-    const { data: perfil } = await supabase.from('perfis').select('academia_id').eq('id', session.user.id).single()
+    const perfil = await getPerfilById(firebaseUser.uid)
     if (perfil) setAcademiaId(perfil.academia_id)
 
-    const [{ data: planosData }, { data: matriculasData }, { data: alunosData }] = await Promise.all([
-      supabase.from('planos').select('*').eq('ativo', true).order('valor'),
-      supabase.from('matriculas').select('*, perfis(nome_completo), planos(nome, valor)').order('data_vencimento', { ascending: true }),
-      supabase.from('perfis').select('id, nome_completo').eq('role', 'ALUNO'),
+    if (!perfil?.academia_id) {
+      setPlanos([])
+      setMatriculas([])
+      setAlunos([])
+      setLoading(false)
+      return
+    }
+
+    const [planosData, matriculasData, alunosData] = await Promise.all([
+      listPlanosByAcademia(perfil.academia_id, true),
+      listMatriculasByAcademiaWithDetails(perfil.academia_id),
+      listAlunosByAcademia(perfil.academia_id),
     ])
 
     setPlanos((planosData as Plano[]) ?? [])
     setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
     setAlunos((alunosData as AlunoOption[]) ?? [])
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => { 
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAll()
+    })
+  }, [authLoading, fetchAll])
 
   // Calcula data de vencimento automaticamente ao mudar plano selecionado
   const calcVencimento = (planoId: string, inicio: string) => {
@@ -104,10 +129,12 @@ export default function PlanosPage() {
     e.preventDefault()
     if (!academiaId || isReceptionist) return
     setSavingPlano(true)
-    await supabase.from('planos').insert({
-      nome: nomePlano, descricao: descPlano,
-      valor: parseFloat(valorPlano), duracao_dias: parseInt(duracaoPlano),
-      academia_id: academiaId
+    await createPlano({
+      nome: nomePlano,
+      descricao: descPlano || null,
+      valor: parseFloat(valorPlano),
+      duracao_dias: parseInt(duracaoPlano),
+      academia_id: academiaId,
     })
     setSavingPlano(false)
     setShowPlanoModal(false)
@@ -120,7 +147,7 @@ export default function PlanosPage() {
     if (!academiaId || !matAlunoId || !matPlanoId) return
     setSavingMat(true)
     const vencimento = calcVencimento(matPlanoId, matInicio)
-    await supabase.from('matriculas').insert({
+    await createMatricula({
       academia_id: academiaId,
       aluno_id: matAlunoId,
       plano_id: matPlanoId,
@@ -128,7 +155,7 @@ export default function PlanosPage() {
       data_vencimento: vencimento,
       valor_pago: matValorPago ? parseFloat(matValorPago) : null,
       observacoes: matObs || null,
-      status: 'ATIVO'
+      status: 'ATIVO',
     })
     setSavingMat(false)
     setShowMatriculaModal(false)
@@ -137,7 +164,7 @@ export default function PlanosPage() {
   }
 
   const handleStatusChange = async (id: string, status: string) => {
-    await supabase.from('matriculas').update({ status }).eq('id', id)
+    await updateMatriculaStatus(id, status as Matricula['status'])
     fetchAll()
   }
 
@@ -221,7 +248,7 @@ export default function PlanosPage() {
                 {matriculas.length === 0 ? (
                   <tr><td colSpan={6} className="text-center py-12 text-[#585759]">Nenhuma matrícula cadastrada ainda.</td></tr>
                 ) : matriculas.map((m) => {
-                  const vencendo = new Date(m.data_vencimento) <= new Date(Date.now() + 7 * 86400000)
+                  const vencendo = new Date(m.data_vencimento) <= vencendoThreshold
                   return (
                     <tr key={m.id} className="hover:bg-[#585759]/5 transition-colors">
                       <td className="p-4 text-white font-medium">{m.perfis?.nome_completo || 'Sem nome'}</td>

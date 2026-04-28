@@ -1,0 +1,9 @@
+# Root-level ignores for monorepo artifacts
+backend/node_modules/
+backend/dist/
+backend/*.log
+backend/npm-debug.log*
+
+# General OS/editor artifacts
+.DS_Store
+*.swp
