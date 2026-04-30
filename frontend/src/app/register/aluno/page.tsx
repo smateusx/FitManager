@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,12 +21,10 @@ function RegisterAlunoForm() {
   const searchParams = useSearchParams()
   const academiaId = searchParams.get('academia_id')
   const router = useRouter()
-
-  useEffect(() => {
-    if (!academiaId) {
-      setErrorMsg('Link de convite inválido. Solicite um novo link à sua academia.')
-    }
-  }, [academiaId])
+  const inviteError = useMemo(
+    () => (!academiaId ? 'Link de convite inválido. Solicite um novo link à sua academia.' : ''),
+    [academiaId]
+  )
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,41 +33,51 @@ function RegisterAlunoForm() {
     setLoading(true)
     setErrorMsg('')
 
-    // Passa academia_id nos metadados — o trigger já cria o perfil com o vínculo correto
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          nome_completo: fullName,
-          academia_id: academiaId,  // <-- trigger lê isso e salva no perfil
+    try {
+      // Passa academia_id nos metadados para vincular o novo aluno corretamente
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            nome_completo: fullName,
+            academia_id: academiaId,
+          },
+        },
+      })
+
+      if (authError) {
+        throw new Error(authError.message)
+      }
+
+      if (!authData.user) {
+        throw new Error('Não foi possível criar a conta. Tente novamente.')
+      }
+
+      // Atualizar telefone (não é coberto pela criação inicial de perfil)
+      if (phone) {
+        const { error: updateError } = await supabase
+          .from('perfis')
+          .update({ telefone: phone })
+          .eq('id', authData.user.id)
+        if (updateError) {
+          throw new Error(updateError.message)
         }
       }
-    })
 
-    if (authError) {
-      setErrorMsg('Erro ao criar conta: ' + authError.message)
+      // Deslogar o aluno recém-cadastrado para manter o fluxo de convite limpo
+      const { error: signOutError } = await supabase.auth.signOut()
+      if (signOutError) {
+        console.warn('Aviso ao encerrar sessão do aluno convidado:', signOutError.message)
+      }
+
+      setSuccess(true)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Falha ao concluir cadastro.'
+      setErrorMsg(`Erro ao criar conta: ${message}`)
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (!authData.user) {
-      setErrorMsg('Não foi possível criar a conta. Tente novamente.')
-      setLoading(false)
-      return
-    }
-
-    // Atualizar telefone (não é coberto pelo trigger, mas com a sessão ativa do novo aluno funciona)
-    if (phone) {
-      await new Promise(r => setTimeout(r, 600)) // aguarda o trigger criar o perfil
-      await supabase.from('perfis').update({ telefone: phone }).eq('id', authData.user.id)
-    }
-
-    // Deslogar o aluno recém-cadastrado para não travar a navegação do admin
-    await supabase.auth.signOut()
-
-    setSuccess(true)
-    setLoading(false)
   }
 
   if (success) {
@@ -115,6 +123,11 @@ function RegisterAlunoForm() {
           {errorMsg && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
               {errorMsg}
+            </div>
+          )}
+          {!errorMsg && inviteError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              {inviteError}
             </div>
           )}
           <form onSubmit={handleRegister} className="space-y-4">

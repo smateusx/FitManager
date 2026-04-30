@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  allowedDevOrigins: [
+    'aivtm-54-85-237-109.run.pinggy-free.link',
+    '*.run.pinggy-free.link',
+  ],
 };
 
 export default nextConfig;

@@ -3,18 +3,26 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Camera, Loader2, User } from 'lucide-react'
+import Image from 'next/image'
+import type { ChangeEvent } from 'react'
 
 interface AvatarUploadProps {
   uid: string
   url: string | null
   onUpload: (url: string) => void
+  disabled?: boolean
 }
 
-export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
+export function AvatarUpload({ uid, url, onUpload, disabled = false }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
 
-  async function uploadAvatar(event: any) {
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
     try {
+      if (disabled) {
+        alert('Upload de avatar desativado: configure o Firebase Storage para habilitar.')
+        return
+      }
+
       setUploading(true)
 
       if (!event.target.files || event.target.files.length === 0) {
@@ -36,8 +44,9 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
 
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
       onUpload(data.publicUrl)
-    } catch (error: any) {
-      alert(error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro inesperado ao enviar avatar.'
+      alert(message)
     } finally {
       setUploading(false)
     }
@@ -48,10 +57,13 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       <div className="relative group">
         <div className="w-32 h-32 rounded-3xl bg-[#585759]/20 border-2 border-dashed border-[#585759]/50 flex items-center justify-center overflow-hidden transition-all group-hover:border-[#F2B705]/50 shadow-2xl">
           {url ? (
-            <img 
-              src={url} 
-              alt="Avatar" 
-              className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+            <Image
+              src={url}
+              alt="Avatar"
+              fill
+              sizes="128px"
+              className="object-cover transition-transform group-hover:scale-110"
+              unoptimized
             />
           ) : (
             <User className="w-12 h-12 text-[#585759] group-hover:text-[#F2B705] transition-colors" />
@@ -64,9 +76,13 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
           )}
         </div>
 
-        <label 
-          htmlFor="avatar-upload" 
-          className="absolute -bottom-2 -right-2 p-3 bg-[#F2B705] rounded-2xl cursor-pointer shadow-lg shadow-[#F2B705]/20 hover:scale-110 active:scale-95 transition-all text-[#0D0D0D]"
+        <label
+          htmlFor="avatar-upload"
+          className={`absolute -bottom-2 -right-2 p-3 rounded-2xl shadow-lg transition-all text-[#0D0D0D] ${
+            disabled
+              ? 'bg-[#585759] cursor-not-allowed opacity-70'
+              : 'bg-[#F2B705] cursor-pointer shadow-[#F2B705]/20 hover:scale-110 active:scale-95'
+          }`}
         >
           <Camera className="w-5 h-5" />
           <input
@@ -74,13 +90,17 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
             type="file"
             accept="image/*"
             onChange={uploadAvatar}
-            disabled={uploading}
+            disabled={uploading || disabled}
             className="hidden"
           />
         </label>
       </div>
       <p className="text-[10px] text-[#585759] uppercase font-bold tracking-widest">
-        {uploading ? 'Enviando...' : 'Clique na câmera para mudar'}
+        {disabled
+          ? 'Upload de avatar indisponível'
+          : uploading
+            ? 'Enviando...'
+            : 'Clique na câmera para mudar'}
       </p>
     </div>
   )

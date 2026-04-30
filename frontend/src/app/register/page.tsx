@@ -15,48 +15,73 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
-    // 1. Criar a conta de autenticação (Gatilho fará ele nascer como ALUNO com academia_id null)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { nome_completo: fullName } }
-    })
+    setErrorMsg('')
 
-    if (authError) {
-      alert('Erro ao criar conta: ' + authError.message)
+    try {
+      // 1. Criar conta de autenticação
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { nome_completo: fullName } }
+      })
+
+      if (authError) {
+        setErrorMsg(`Erro ao criar conta: ${authError.message}`)
+        return
+      }
+
+      if (!authData.user?.id) {
+        setErrorMsg('Cadastro não concluído. Tente novamente com outro e-mail.')
+        return
+      }
+
+      // 2. Criar academia
+      const { data: gymData, error: gymError } = await supabase
+        .from('academias')
+        .insert({ nome: gymName })
+        .select()
+        .single()
+
+      if (gymError) {
+        setErrorMsg(`Erro ao criar academia: ${gymError.message}`)
+        return
+      }
+
+      if (!gymData || typeof gymData.id !== 'string') {
+        setErrorMsg('Academia não foi criada corretamente. Tente novamente.')
+        return
+      }
+
+      // 3. Promover perfil para ADMIN da nova academia
+      const { error: profileError } = await supabase
+        .from('perfis')
+        .update({
+          academia_id: gymData.id,
+          role: 'ADMIN'
+        })
+        .eq('id', authData.user.id)
+
+      if (profileError) {
+        setErrorMsg(`Conta criada, mas falhou ao vincular perfil admin: ${profileError.message}`)
+        return
+      }
+
+      // 4. Reautenticar pelo login para evitar sessão inconsistente pós cadastro
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Erro inesperado ao finalizar cadastro.'
+      setErrorMsg(message)
+    } finally {
       setLoading(false)
-      return
     }
-
-    // Como no Supabase o login automático acontece após o signup, o usuário já estará "logado" nesta sessão.
-    // 2. Criar a academia no banco de dados
-    const { data: gymData, error: gymError } = await supabase
-      .from('academias')
-      .insert({ nome: gymName })
-      .select()
-      .single()
-
-    if (gymError) {
-      console.error('Gatilho/RLS Error:', gymError)
-      alert('Erro (Acesso DB): ' + gymError.message)
-    } else if (gymData && authData.user) {
-      // 3. Elevar os privilégios do usuário recém-criado para ADMIN da sua própria academia
-      await supabase.from('perfis').update({
-        academia_id: gymData.id,
-        role: 'ADMIN'
-      }).eq('id', authData.user.id)
-      
-      alert('Conta de academia criada com sucesso!')
-      router.push('/dashboard')
-    }
-
-    setLoading(false)
   }
 
   return (
@@ -79,6 +104,11 @@ export default function RegisterPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-5">
+            {errorMsg && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                {errorMsg}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="gymName" className="text-[#A6A6A6]">Nome da Academia</Label>
               <Input 

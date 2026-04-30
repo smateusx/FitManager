@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { isFirebaseStorageEnabled } from '@/lib/firebase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -185,6 +186,7 @@ export default function AlunoPerfilPage() {
                 uid={user?.id} 
                 url={perfil?.avatar_url} 
                 onUpload={handleAvatarUpload} 
+                disabled={!isFirebaseStorageEnabled}
               />
               
               <div className="mt-8 space-y-4">

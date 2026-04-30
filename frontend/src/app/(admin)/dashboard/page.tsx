@@ -25,6 +25,21 @@ type RecentActivity = {
   data: string
 }
 
+type MatriculaResumo = {
+  valor_pago: number | null
+  status: 'ATIVO' | 'VENCIDO' | 'CANCELADO'
+  data_vencimento: string
+}
+
+type MatriculaAtividade = {
+  id: string
+  valor_pago: number | null
+  criado_em: string
+  status: 'ATIVO' | 'VENCIDO' | 'CANCELADO'
+  perfis?: { nome_completo?: string | null } | null
+  planos?: { nome?: string | null } | null
+}
+
 export default function DashboardPage() {
   const { profile, loading: authLoading, isReceptionist } = useAuth()
   const [stats, setStats] = useState<Stats>({ 
@@ -63,12 +78,12 @@ export default function DashboardPage() {
         .select('valor_pago, status, data_vencimento')
         .gte('criado_em', startOfMonth)
 
-      const receita = (matriculasMes || [])
-        .filter(m => m.status === 'ATIVO' && m.valor_pago)
-        .reduce((sum, m) => sum + Number(m.valor_pago), 0)
+      const receita = ((matriculasMes as MatriculaResumo[] | null) || [])
+        .filter((m: MatriculaResumo) => m.status === 'ATIVO' && m.valor_pago)
+        .reduce((sum: number, m: MatriculaResumo) => sum + Number(m.valor_pago), 0)
 
-      const vencimentos = (matriculasMes || [])
-        .filter(m => m.status === 'VENCIDO')
+      const vencimentos = ((matriculasMes as MatriculaResumo[] | null) || [])
+        .filter((m: MatriculaResumo) => m.status === 'VENCIDO')
         .length
 
       // 3. Atividades Recentes
@@ -78,7 +93,7 @@ export default function DashboardPage() {
         .order('criado_em', { ascending: false })
         .limit(5)
 
-      const formattedActivities = (recentData || []).map((m: any) => ({
+      const formattedActivities = ((recentData as MatriculaAtividade[] | null) || []).map((m: MatriculaAtividade) => ({
         id: m.id,
         aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
         plano_nome: m.planos?.nome || 'Plano Personalizado',

@@ -23,8 +23,14 @@ type Registro = {
   repeticoes: number
 }
 
+type ChartPoint = {
+  data: string
+  carga: number
+  repeticoes: number
+}
+
 export function EvolutionChart({ exercicioId, alunoId }: Props) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export function EvolutionChart({ exercicioId, alunoId }: Props) {
       if (error) {
         console.error('Erro ao buscar evolução:', error)
       } else {
-        const formatted = (registros || []).map(r => ({
+        const formatted = ((registros as Registro[] | null) || []).map((r) => ({
           ...r,
           data: new Date(r.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
           carga: Number(r.carga)
