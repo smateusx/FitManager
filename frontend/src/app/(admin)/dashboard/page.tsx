@@ -44,6 +44,7 @@ export default function DashboardPage() {
   })
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const router = useRouter()
 
@@ -54,39 +55,48 @@ export default function DashboardPage() {
     }
 
     const loadDashboard = async () => {
-      const totalAlunos = await countPerfisRole(academiaId, 'ALUNO')
-      const totalTreinos = await countFichasAcademia(academiaId)
+      setLoadError(null)
+      try {
+        const totalAlunos = await countPerfisRole(academiaId, 'ALUNO')
+        const totalTreinos = await countFichasAcademia(academiaId)
 
-      const now = new Date()
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const matriculasMes = await matriculasCriadasDesde(academiaId, startOfMonth)
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const matriculasMes = await matriculasCriadasDesde(academiaId, startOfMonth)
 
-      const receita = (matriculasMes || [])
-        .filter((m: any) => m.status === 'ATIVO' && m.valor_pago)
-        .reduce((sum, m: any) => sum + Number(m.valor_pago), 0)
+        const receita = (matriculasMes || [])
+          .filter((m: any) => m.status === 'ATIVO' && m.valor_pago)
+          .reduce((sum, m: any) => sum + Number(m.valor_pago), 0)
 
-      const vencimentos = (matriculasMes || []).filter((m: any) => m.status === 'VENCIDO').length
+        const vencimentos = (matriculasMes || []).filter((m: any) => m.status === 'VENCIDO').length
 
-      const recentData = await matriculasRecentes(academiaId, 5)
-      const formattedActivities = (recentData || []).map((m: any) => ({
-        id: m.id,
-        aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
-        plano_nome: m.planos?.nome || 'Plano Personalizado',
-        valor: Number(m.valor_pago || 0),
-        data: m.criado_em,
-      }))
+        const recentData = await matriculasRecentes(academiaId, 5)
+        const formattedActivities = (recentData || []).map((m: any) => ({
+          id: m.id,
+          aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
+          plano_nome: m.planos?.nome || 'Plano Personalizado',
+          valor: Number(m.valor_pago || 0),
+          data: m.criado_em,
+        }))
 
-      setStats({
-        totalAlunos,
-        alunosAtivos: totalAlunos,
-        totalTreinos,
-        semTreino: Math.max(0, totalAlunos - totalTreinos),
-        receitaMensal: receita,
-        vencimentosMes: vencimentos,
-      })
+        setStats({
+          totalAlunos,
+          alunosAtivos: totalAlunos,
+          totalTreinos,
+          semTreino: Math.max(0, totalAlunos - totalTreinos),
+          receitaMensal: receita,
+          vencimentosMes: vencimentos,
+        })
 
-      setRecentActivities(formattedActivities)
-      setLoading(false)
+        setRecentActivities(formattedActivities)
+      } catch (e) {
+        console.error('Erro ao carregar dashboard:', e)
+        const msg =
+          e instanceof Error ? e.message : 'Não foi possível carregar os dados. Veja a consola (F12).'
+        setLoadError(msg)
+      } finally {
+        setLoading(false)
+      }
     }
 
     loadDashboard()
@@ -218,6 +228,16 @@ export default function DashboardPage() {
             </button>
           </div>
         </header>
+
+        {loadError && !loading && (
+          <div className="mt-8 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm">
+            <p className="font-semibold mb-1">Erro ao carregar o painel</p>
+            <p className="text-red-200/90">{loadError}</p>
+            <p className="mt-2 text-[#A6A6A6] text-xs">
+              Regras ou índices do Firestore em falta são causas comuns. Abra F12 → Consola para mais detalhes.
+            </p>
+          </div>
+        )}
 
         {loading ? (
           <div className="mt-12 flex justify-center">
