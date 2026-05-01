@@ -2,31 +2,23 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { signOut, updatePassword } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
+import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AvatarUpload } from '@/components/avatar-upload'
-import { 
-  Dumbbell, 
-  User, 
-  Lock, 
-  Save, 
-  Loader2, 
-  CheckCircle2, 
-  ChevronLeft,
-  Smartphone,
-  LogOut
-} from 'lucide-react'
+import { User, Lock, Save, Loader2, CheckCircle2, ChevronLeft, Smartphone, LogOut } from 'lucide-react'
 
 export default function AlunoPerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
-  
-  const [user, setUser] = useState<any>(null)
+
+  const [userId, setUserId] = useState<string | null>(null)
   const [perfil, setPerfil] = useState<any>(null)
-  
+
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -40,19 +32,16 @@ export default function AlunoPerfilPage() {
 
   async function fetchProfile() {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      const u = getFirebaseAuth().currentUser
+      if (!u) {
+        router.push('/login')
+        return
+      }
+      setUserId(u.uid)
 
-      setUser(session.user)
+      const data = await getPerfil(u.uid)
+      if (!data) return
 
-      const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-
-      if (error) throw error
-      
       setPerfil(data)
       setNome(data.nome_completo || '')
       setTelefone(data.telefone || '')
@@ -65,24 +54,21 @@ export default function AlunoPerfilPage() {
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
+    if (!userId) return
     setSaving(true)
     setSuccess(null)
 
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({
-          nome_completo: nome,
-          telefone: telefone
-        })
-        .eq('id', user.id)
+      await savePerfilDoc(userId, {
+        nome_completo: nome,
+        telefone: telefone,
+      })
 
-      if (error) throw error
-      
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao atualizar perfil: ' + err.message)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro'
+      alert('Erro ao atualizar perfil: ' + msg)
     } finally {
       setSaving(false)
     }
@@ -97,37 +83,33 @@ export default function AlunoPerfilPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
+      const u = getFirebaseAuth().currentUser
+      if (!u) return
+      await updatePassword(u, newPassword)
 
-      if (error) throw error
-      
       setSuccess('Senha alterada com sucesso!')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao alterar senha: ' + err.message)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro'
+      alert('Erro ao alterar senha: ' + msg)
     } finally {
       setSaving(false)
     }
   }
 
   async function handleAvatarUpload(url: string) {
+    if (!userId) return
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({ avatar_url: url })
-        .eq('id', user.id)
+      await savePerfilDoc(userId, { avatar_url: url })
 
-      if (error) throw error
-      
       setPerfil({ ...perfil, avatar_url: url })
       setSuccess('Foto de perfil atualizada!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao salvar URL do avatar: ' + err.message)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro'
+      alert('Erro ao salvar URL do avatar: ' + msg)
     }
   }
 
@@ -141,10 +123,9 @@ export default function AlunoPerfilPage() {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
-      {/* Mini Header */}
       <nav className="sticky top-0 z-30 bg-[#0D0D0D]/80 backdrop-blur-md border-b border-[#585759]/30">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <button 
+          <button
             onClick={() => router.push('/meu-treino')}
             className="flex items-center gap-2 text-[#A6A6A6] hover:text-white transition-colors group"
           >
@@ -152,9 +133,9 @@ export default function AlunoPerfilPage() {
             <span className="font-bold text-sm">Voltar ao Treino</span>
           </button>
 
-          <button 
+          <button
             onClick={async () => {
-              await supabase.auth.signOut()
+              await signOut(getFirebaseAuth())
               router.push('/login')
             }}
             className="p-2 text-[#A6A6A6] hover:text-red-500 rounded-xl transition-all"
@@ -178,108 +159,55 @@ export default function AlunoPerfilPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Avatar Section */}
-          <div className="lg:col-span-1">
-            <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl">
-              <AvatarUpload 
-                uid={user?.id} 
-                url={perfil?.avatar_url} 
-                onUpload={handleAvatarUpload} 
-              />
-              
-              <div className="mt-8 space-y-4">
-                <div className="p-4 bg-[#585759]/5 rounded-2xl border border-[#585759]/10">
-                  <p className="text-[10px] text-[#585759] uppercase font-bold tracking-widest mb-1">E-mail</p>
-                  <p className="text-white text-xs truncate">{user?.email}</p>
-                </div>
-              </div>
-            </div>
+          <div className="lg:col-span-1 flex flex-col items-center">
+            {userId && <AvatarUpload uid={userId} url={perfil?.avatar_url} onUpload={handleAvatarUpload} />}
           </div>
 
-          {/* Forms Section */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Informações Pessoais */}
-            <section className="bg-[#585759]/5 border border-[#585759]/20 rounded-3xl p-8">
-              <div className="flex items-center gap-3 mb-6">
+          <div className="lg:col-span-2 space-y-10">
+            <form onSubmit={handleUpdateProfile} className="space-y-6 p-6 border border-[#585759]/30 rounded-2xl bg-[#0D0D0D]/50">
+              <div className="flex items-center gap-3 mb-2">
                 <User className="w-5 h-5 text-[#F2B705]" />
-                <h2 className="text-xl font-bold text-white">Dados Pessoais</h2>
+                <h2 className="text-xl font-bold">Dados Pessoais</h2>
               </div>
 
-              <form onSubmit={handleUpdateProfile} className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-[#A6A6A6]">Nome Completo</Label>
-                  <Input 
-                    value={nome} 
-                    onChange={e => setNome(e.target.value)} 
-                    required
-                    className="bg-[#0D0D0D] border-[#585759]/30 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#A6A6A6]">WhatsApp</Label>
-                  <div className="relative">
-                    <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#585759]" />
-                    <Input 
-                      value={telefone} 
-                      onChange={e => setTelefone(e.target.value)} 
-                      placeholder="(00) 00000-0000"
-                      className="bg-[#0D0D0D] border-[#585759]/30 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl pl-12"
-                    />
-                  </div>
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  disabled={saving}
-                  className="w-full bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold h-12 rounded-xl"
-                >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Salvar Alterações'}
-                </Button>
-              </form>
-            </section>
-
-            {/* Segurança */}
-            <section className="bg-[#585759]/5 border border-[#585759]/20 rounded-3xl p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <Lock className="w-5 h-5 text-red-500" />
-                <h2 className="text-xl font-bold text-white">Alterar Senha</h2>
+              <div className="space-y-2">
+                <Label htmlFor="nome">Nome Completo</Label>
+                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} className="bg-[#0D0D0D] border-[#585759]" />
               </div>
 
-              <form onSubmit={handleChangePassword} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[#A6A6A6]">Nova Senha</Label>
-                    <Input 
-                      type="password" 
-                      value={newPassword} 
-                      onChange={e => setNewPassword(e.target.value)} 
-                      required
-                      minLength={6}
-                      className="bg-[#0D0D0D] border-[#585759]/30 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#A6A6A6]">Repetir Senha</Label>
-                    <Input 
-                      type="password" 
-                      value={confirmPassword} 
-                      onChange={e => setConfirmPassword(e.target.value)} 
-                      required
-                      minLength={6}
-                      className="bg-[#0D0D0D] border-[#585759]/30 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="telefone" className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4" /> Telefone
+                </Label>
+                <Input id="telefone" value={telefone} onChange={(e) => setTelefone(e.target.value)} className="bg-[#0D0D0D] border-[#585759]" />
+              </div>
+
+              <Button type="submit" disabled={saving} className="bg-[#F2B705] text-[#0D0D0D] font-bold">
+                <Save className="w-4 h-4 mr-2" /> Salvar alterações
+              </Button>
+            </form>
+
+            <form onSubmit={handleChangePassword} className="space-y-6 p-6 border border-[#585759]/30 rounded-2xl bg-[#0D0D0D]/50">
+              <div className="flex items-center gap-3 mb-2">
+                <Lock className="w-5 h-5 text-[#F2B705]" />
+                <h2 className="text-xl font-bold">Segurança</h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Nova senha</Label>
+                  <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="bg-[#0D0D0D] border-[#585759]" />
                 </div>
-                
-                <Button 
-                  type="submit" 
-                  disabled={saving || !newPassword}
-                  className="w-full bg-white/5 border border-white/10 text-white hover:bg-white/10 font-bold h-12 rounded-xl"
-                >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Atualizar Senha'}
-                </Button>
-              </form>
-            </section>
+                <div className="space-y-2">
+                  <Label>Confirmar</Label>
+                  <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="bg-[#0D0D0D] border-[#585759]" />
+                </div>
+              </div>
+
+              <Button type="submit" disabled={saving} variant="outline" className="border-[#F2B705] text-[#F2B705]">
+                Alterar senha
+              </Button>
+            </form>
           </div>
         </div>
       </main>

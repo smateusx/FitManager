@@ -1,0 +1,86 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academia_id", "order": "ASCENDING" },
+        { "fieldPath": "data_vencimento", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academia_id", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aluno_id", "order": "ASCENDING" },
+        { "fieldPath": "data_vencimento", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academia_id", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "fichas_treino",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academia_id", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "fichas_treino",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aluno_id", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "exercicios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ficha_id", "order": "ASCENDING" },
+        { "fieldPath": "ordem", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "registros_carga",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aluno_id", "order": "ASCENDING" },
+        { "fieldPath": "exercicio_id", "order": "ASCENDING" },
+        { "fieldPath": "data_registro", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "perfis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academia_id", "order": "ASCENDING" },
+        { "fieldPath": "role", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "academia_id", "order": "ASCENDING" },
+        { "fieldPath": "data_inicio", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

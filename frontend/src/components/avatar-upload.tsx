@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { getFirebaseStorage } from '@/lib/firebase'
 import { Camera, Loader2, User } from 'lucide-react'
 
 interface AvatarUploadProps {
@@ -13,7 +14,7 @@ interface AvatarUploadProps {
 export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
 
-  async function uploadAvatar(event: any) {
+  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true)
 
@@ -24,20 +25,14 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       const file = event.target.files[0]
       const fileExt = file.name.split('.').pop()
       const fileName = `${uid}-${Math.random()}.${fileExt}`
-      const filePath = `${fileName}`
+      const storageRef = ref(getFirebaseStorage(), `avatars/${fileName}`)
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file)
-
-      if (uploadError) {
-        throw uploadError
-      }
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
-      onUpload(data.publicUrl)
-    } catch (error: any) {
-      alert(error.message)
+      await uploadBytes(storageRef, file)
+      const publicUrl = await getDownloadURL(storageRef)
+      onUpload(publicUrl)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Erro no upload'
+      alert(msg)
     } finally {
       setUploading(false)
     }
@@ -48,15 +43,11 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
       <div className="relative group">
         <div className="w-32 h-32 rounded-3xl bg-[#585759]/20 border-2 border-dashed border-[#585759]/50 flex items-center justify-center overflow-hidden transition-all group-hover:border-[#F2B705]/50 shadow-2xl">
           {url ? (
-            <img 
-              src={url} 
-              alt="Avatar" 
-              className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-            />
+            <img src={url} alt="Avatar" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
           ) : (
             <User className="w-12 h-12 text-[#585759] group-hover:text-[#F2B705] transition-colors" />
           )}
-          
+
           {uploading && (
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-[#F2B705] animate-spin" />
@@ -64,8 +55,8 @@ export function AvatarUpload({ uid, url, onUpload }: AvatarUploadProps) {
           )}
         </div>
 
-        <label 
-          htmlFor="avatar-upload" 
+        <label
+          htmlFor="avatar-upload"
           className="absolute -bottom-2 -right-2 p-3 bg-[#F2B705] rounded-2xl cursor-pointer shadow-lg shadow-[#F2B705]/20 hover:scale-110 active:scale-95 transition-all text-[#0D0D0D]"
         >
           <Camera className="w-5 h-5" />

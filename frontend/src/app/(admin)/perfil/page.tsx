@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { updatePassword } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
+import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,10 +14,11 @@ export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
-  
-  const [user, setUser] = useState<any>(null)
+
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [perfil, setPerfil] = useState<any>(null)
-  
+
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -27,19 +30,15 @@ export default function PerfilPage() {
 
   async function fetchProfile() {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      const u = getFirebaseAuth().currentUser
+      if (!u) return
 
-      setUser(session.user)
+      setUserId(u.uid)
+      setUserEmail(u.email ?? null)
 
-      const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
+      const data = await getPerfil(u.uid)
+      if (!data) return
 
-      if (error) throw error
-      
       setPerfil(data)
       setNome(data.nome_completo || '')
       setTelefone(data.telefone || '')
@@ -52,24 +51,21 @@ export default function PerfilPage() {
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
+    if (!userId) return
     setSaving(true)
     setSuccess(null)
 
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({
-          nome_completo: nome,
-          telefone: telefone
-        })
-        .eq('id', user.id)
+      await savePerfilDoc(userId, {
+        nome_completo: nome,
+        telefone: telefone,
+      })
 
-      if (error) throw error
-      
       setSuccess('Perfil atualizado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao atualizar perfil: ' + err.message)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro'
+      alert('Erro ao atualizar perfil: ' + msg)
     } finally {
       setSaving(false)
     }
@@ -84,37 +80,33 @@ export default function PerfilPage() {
 
     setSaving(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
+      const u = getFirebaseAuth().currentUser
+      if (!u) return
+      await updatePassword(u, newPassword)
 
-      if (error) throw error
-      
       setSuccess('Senha alterada com sucesso!')
       setNewPassword('')
       setConfirmPassword('')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao alterar senha: ' + err.message)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro'
+      alert('Erro ao alterar senha: ' + msg)
     } finally {
       setSaving(false)
     }
   }
 
   async function handleAvatarUpload(url: string) {
+    if (!userId) return
     try {
-      const { error } = await supabase
-        .from('perfis')
-        .update({ avatar_url: url })
-        .eq('id', user.id)
+      await savePerfilDoc(userId, { avatar_url: url })
 
-      if (error) throw error
-      
       setPerfil({ ...perfil, avatar_url: url })
       setSuccess('Foto de perfil atualizada!')
       setTimeout(() => setSuccess(null), 3000)
-    } catch (err: any) {
-      alert('Erro ao salvar URL do avatar: ' + err.message)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro'
+      alert('Erro ao salvar URL do avatar: ' + msg)
     }
   }
 
@@ -142,19 +134,14 @@ export default function PerfilPage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Avatar Section */}
           <div className="lg:col-span-1">
             <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl sticky top-8">
-              <AvatarUpload 
-                uid={user?.id} 
-                url={perfil?.avatar_url} 
-                onUpload={handleAvatarUpload} 
-              />
-              
+              {userId && <AvatarUpload uid={userId} url={perfil?.avatar_url} onUpload={handleAvatarUpload} />}
+
               <div className="mt-8 space-y-4">
                 <div className="p-4 bg-[#585759]/10 rounded-2xl border border-[#585759]/20">
                   <p className="text-[10px] text-[#A6A6A6] uppercase font-bold tracking-widest mb-1">E-mail de Acesso</p>
-                  <p className="text-white text-sm truncate font-medium">{user?.email}</p>
+                  <p className="text-white text-sm truncate font-medium">{userEmail}</p>
                 </div>
                 <div className="p-4 bg-[#585759]/10 rounded-2xl border border-[#585759]/20">
                   <p className="text-[10px] text-[#A6A6A6] uppercase font-bold tracking-widest mb-1">Nível de Acesso</p>
@@ -167,9 +154,7 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          {/* Forms Section */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Informações Pessoais */}
             <section className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-[#F2B705]/10 rounded-lg">
@@ -181,9 +166,9 @@ export default function PerfilPage() {
               <form onSubmit={handleUpdateProfile} className="space-y-6">
                 <div className="space-y-2">
                   <Label className="text-[#A6A6A6]">Nome Completo</Label>
-                  <Input 
-                    value={nome} 
-                    onChange={e => setNome(e.target.value)} 
+                  <Input
+                    value={nome}
+                    onChange={(e) => setNome(e.target.value)}
                     required
                     className="bg-[#0D0D0D] border-[#585759]/50 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl"
                   />
@@ -192,26 +177,31 @@ export default function PerfilPage() {
                   <Label className="text-[#A6A6A6]">Telefone / WhatsApp</Label>
                   <div className="relative">
                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#585759]" />
-                    <Input 
-                      value={telefone} 
-                      onChange={e => setTelefone(e.target.value)} 
+                    <Input
+                      value={telefone}
+                      onChange={(e) => setTelefone(e.target.value)}
                       placeholder="(00) 00000-0000"
                       className="bg-[#0D0D0D] border-[#585759]/50 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl pl-12"
                     />
                   </div>
                 </div>
-                
-                <Button 
-                  type="submit" 
+
+                <Button
+                  type="submit"
                   disabled={saving}
                   className="w-full bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold h-12 rounded-xl shadow-lg shadow-[#F2B705]/10"
                 >
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-4 h-4 mr-2" /> Salvar Alterações</>}
+                  {saving ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" /> Salvar Alterações
+                    </>
+                  )}
                 </Button>
               </form>
             </section>
 
-            {/* Segurança */}
             <section className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-red-500/10 rounded-lg">
@@ -224,10 +214,10 @@ export default function PerfilPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="text-[#A6A6A6]">Nova Senha</Label>
-                    <Input 
-                      type="password" 
-                      value={newPassword} 
-                      onChange={e => setNewPassword(e.target.value)} 
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
                       required
                       minLength={6}
                       className="bg-[#0D0D0D] border-[#585759]/50 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl"
@@ -235,19 +225,19 @@ export default function PerfilPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[#A6A6A6]">Confirmar Senha</Label>
-                    <Input 
-                      type="password" 
-                      value={confirmPassword} 
-                      onChange={e => setConfirmPassword(e.target.value)} 
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       minLength={6}
                       className="bg-[#0D0D0D] border-[#585759]/50 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl"
                     />
                   </div>
                 </div>
-                
-                <Button 
-                  type="submit" 
+
+                <Button
+                  type="submit"
                   disabled={saving || !newPassword}
                   className="w-full bg-[#585759]/20 border border-[#585759]/50 text-white hover:bg-[#585759]/30 font-bold h-12 rounded-xl"
                 >

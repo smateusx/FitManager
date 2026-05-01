@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getFirebaseAuth } from '@/lib/firebase'
+import {
+  deleteFicha,
+  getPerfil,
+  insertExercicios,
+  insertFicha,
+  listAlunosByAcademia,
+  listFichasByAcademia,
+} from '@/lib/firestore'
 import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -60,21 +68,23 @@ export default function TreinosPage() {
 
   const fetchAll = async () => {
     setLoading(true)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.push('/login'); return }
+    const u = getFirebaseAuth().currentUser
+    if (!u) {
+      router.push('/login')
+      return
+    }
 
-    const { data: profile } = await supabase.from('perfis').select('academia_id').eq('id', session.user.id).single()
-    if (profile) setAcademiaId(profile.academia_id)
+    const profile = await getPerfil(u.uid)
+    if (profile?.academia_id) setAcademiaId(profile.academia_id)
+    const aid = profile?.academia_id
+    if (!aid) {
+      setLoading(false)
+      return
+    }
 
-    const { data: fichasData } = await supabase
-      .from('fichas_treino')
-      .select('*, perfis(nome_completo), exercicios(*)')
-      .order('criado_em', { ascending: false })
-
-    const { data: alunosData } = await supabase
-      .from('perfis')
-      .select('id, nome_completo')
-      .eq('role', 'ALUNO')
+    const fichasData = await listFichasByAcademia(aid)
+    const alunosRows = await listAlunosByAcademia(aid)
+    const alunosData = alunosRows.map((r) => ({ id: r.id, nome_completo: r.nome_completo }))
 
     setFichas((fichasData as Ficha[]) ?? [])
     setAlunos((alunosData as AlunoOption[]) ?? [])
@@ -92,23 +102,27 @@ export default function TreinosPage() {
     if (!academiaId || !alunoSel || isReceptionist) return
     setSaving(true)
 
-    const { data: fichaData, error: fichaErr } = await supabase
-      .from('fichas_treino')
-      .insert({ nome: nomeFicha, objetivo, aluno_id: alunoSel, academia_id: academiaId })
-      .select().single()
-
-    if (fichaErr || !fichaData) {
-      alert('Erro ao criar ficha: ' + fichaErr?.message)
-      setSaving(false)
-      return
-    }
+    const { id: fichaId } = await insertFicha({
+      nome: nomeFicha,
+      objetivo,
+      aluno_id: alunoSel,
+      academia_id: academiaId,
+    })
 
     const exRows = exercicios
-      .filter(ex => ex.nome.trim())
-      .map((ex, i) => ({ ...ex, ficha_id: fichaData.id, ordem: i }))
+      .filter((ex) => ex.nome.trim())
+      .map((ex, i) => ({
+        nome: ex.nome,
+        series: ex.series,
+        repeticoes: ex.repeticoes,
+        carga: ex.carga,
+        descanso: ex.descanso,
+        ordem: i,
+        ficha_id: fichaId,
+      }))
 
     if (exRows.length > 0) {
-      await supabase.from('exercicios').insert(exRows)
+      await insertExercicios(exRows)
     }
 
     setSaving(false)
@@ -120,7 +134,7 @@ export default function TreinosPage() {
   const handleDelete = async (id: string) => {
     if (isReceptionist) return
     if (!confirm('Tem certeza que deseja excluir esta ficha?')) return
-    await supabase.from('fichas_treino').delete().eq('id', id)
+    await deleteFicha(id)
     fetchAll()
   }
 

@@ -3,7 +3,8 @@
 import { ReactNode, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { signOut } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
 import Link from 'next/link'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -104,7 +105,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
           <button 
             onClick={async () => {
-              await supabase.auth.signOut()
+              await signOut(getFirebaseAuth())
               router.push('/login')
             }}
             className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-[#A6A6A6] hover:bg-red-500/10 hover:text-red-500 transition-colors"

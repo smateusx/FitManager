@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { supabase } from '@/lib/supabase'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -21,24 +22,21 @@ export default function LoginPage() {
     setLoading(true)
     setErrorMsg('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setErrorMsg('E-mail ou senha incorretos. Tente novamente.')
-      setLoading(false)
-    } else {
-      // Dashboard page handles role-based routing (admin vs aluno)
+    try {
+      await signInWithEmailAndPassword(getFirebaseAuth(), email, password)
       router.push('/dashboard')
+    } catch {
+      setErrorMsg('E-mail ou senha incorretos. Tente novamente.')
+    } finally {
+      setLoading(false)
     }
   }
 
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4 relative overflow-hidden">
-      {/* Background gradients using brand colors */}
       <div className="absolute top-0 left-1/2 w-[800px] h-[400px] -translate-x-1/2 bg-[#F2B705]/10 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-[600px] h-[300px] bg-[#BF9004]/10 blur-[100px] rounded-full pointer-events-none" />
-      
+
       <Card className="w-full max-w-md border-[#585759] bg-[#0D0D0D]/80 backdrop-blur-xl shadow-2xl z-10">
         <CardHeader className="space-y-2 text-center pb-6">
           <div className="mx-auto w-12 h-12 bg-[#F2B705] rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-[#F2B705]/20">
@@ -52,16 +50,14 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             {errorMsg && (
-              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                {errorMsg}
-              </div>
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">{errorMsg}</div>
             )}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-[#A6A6A6]">E-mail</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="seu@email.com" 
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
                 className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -73,18 +69,18 @@ export default function LoginPage() {
                 <Label htmlFor="password" className="text-[#A6A6A6]">Senha</Label>
                 <Link href="#" className="text-sm font-medium text-[#F2B705] hover:text-[#BF9004] transition-colors">Esqueceu a senha?</Link>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="••••••••" 
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
                 className="bg-[#0D0D0D] border-[#585759] text-white focus-visible:ring-[#F2B705] h-11"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full h-11 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold transition-all shadow-lg shadow-[#F2B705]/20"
               disabled={loading}
             >

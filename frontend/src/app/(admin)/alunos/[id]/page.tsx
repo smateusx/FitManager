@@ -2,12 +2,21 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getFirebaseAuth } from '@/lib/firebase'
+import {
+  deleteAlunoData,
+  getAlunoComAcademia,
+  getPerfil,
+  insertMatriculaFull,
+  listFichasByAluno,
+  listMatriculasByAluno,
+  listPlanos,
+} from '@/lib/firestore'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { 
-  User, 
+  User as UserIcon, 
   Dumbbell, 
   CreditCard, 
   ChevronLeft, 
@@ -84,51 +93,39 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
     const fetchData = async () => {
       setLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
+      const u = getFirebaseAuth().currentUser
+      if (!u) {
+        router.push('/login')
+        return
+      }
 
-      // 1. Buscar dados básicos do aluno
-      const { data: alunoData, error: alunoErr } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', alunoId)
-        .single()
-
-      if (alunoErr || !alunoData) {
-        console.error('Erro ao buscar aluno:', alunoErr)
+      const alunoData = await getAlunoComAcademia(alunoId)
+      if (!alunoData) {
         router.push('/alunos')
         return
       }
 
-      setAluno(alunoData as AlunoDetail)
+      setAluno({
+        id: alunoData.id,
+        nome_completo: (alunoData as Record<string, unknown>).nome_completo as string | null,
+        telefone: (alunoData as Record<string, unknown>).telefone as string | null,
+        role: (alunoData as Record<string, unknown>).role as string,
+        created_at: ((alunoData as Record<string, unknown>).created_at as string) || new Date().toISOString(),
+        academia_id: (alunoData as Record<string, unknown>).academia_id as string,
+      })
 
-      // 2. Buscar fichas de treino
-      const { data: fichasData } = await supabase
-        .from('fichas_treino')
-        .select('*, exercicios(*)')
-        .eq('aluno_id', alunoId)
-        .order('criado_em', { ascending: false })
-
+      const fichasData = await listFichasByAluno(alunoId)
       setFichas((fichasData as Ficha[]) ?? [])
 
-      // 3. Buscar histórico financeiro/matrículas
-      const { data: matriculasData } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor)')
-        .eq('aluno_id', alunoId)
-        .order('data_vencimento', { ascending: false })
-
+      const matriculasData = await listMatriculasByAluno(alunoId)
       setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
-      
-      // 4. Buscar planos disponíveis para renovação
-      const { data: planosData } = await supabase
-        .from('planos')
-        .select('*')
-        .eq('ativo', true)
-        .order('valor')
-      
-      setPlanos(planosData || [])
-      
+
+      const admin = await getPerfil(u.uid)
+      if (admin?.academia_id) {
+        const planosData = await listPlanos(admin.academia_id, true)
+        setPlanos(planosData || [])
+      }
+
       setLoading(false)
     }
 
@@ -146,28 +143,18 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       const dataVencimento = new Date(dataInicio)
       dataVencimento.setDate(dataVencimento.getDate() + (plano?.duracao_dias || 30))
 
-      const { error } = await supabase
-        .from('matriculas')
-        .insert({
-          academia_id: aluno.academia_id,
-          aluno_id: alunoId,
-          plano_id: selectedPlanoId,
-          data_inicio: renewDate,
-          data_vencimento: dataVencimento.toISOString().split('T')[0],
-          valor_pago: parseFloat(renewValor) || plano?.valor,
-          status: 'ATIVO'
-        })
-
-      if (error) throw error
+      await insertMatriculaFull({
+        academia_id: aluno.academia_id,
+        aluno_id: alunoId,
+        plano_id: selectedPlanoId,
+        data_inicio: renewDate,
+        data_vencimento: dataVencimento.toISOString().split('T')[0],
+        valor_pago: parseFloat(renewValor) || (plano?.valor as number),
+        status: 'ATIVO',
+      })
 
       setShowRenewModal(false)
-      // Atualizar lista de matrículas
-      const { data: updatedMatriculas } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor)')
-        .eq('aluno_id', alunoId)
-        .order('data_vencimento', { ascending: false })
-      
+      const updatedMatriculas = await listMatriculasByAluno(alunoId)
       setMatriculas((updatedMatriculas as unknown as Matricula[]) ?? [])
       alert('Matrícula renovada com sucesso!')
     } catch (err) {
@@ -183,8 +170,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
     if (!confirm('TEM CERTEZA? Isso excluirá permanentemente o aluno, suas matrículas e treinos.')) return
     
     try {
-      const { error } = await supabase.from('perfis').delete().eq('id', alunoId)
-      if (error) throw error
+      await deleteAlunoData(alunoId)
       alert('Aluno excluído com sucesso.')
       router.push('/alunos')
     } catch (err) {
@@ -220,7 +206,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-[#585759]/30">
           <div className="flex items-center gap-5">
             <div className="w-20 h-20 bg-[#F2B705]/10 rounded-2xl flex items-center justify-center border border-[#F2B705]/20 shadow-lg shadow-[#F2B705]/5">
-              <User className="w-10 h-10 text-[#F2B705]" />
+              <UserIcon className="w-10 h-10 text-[#F2B705]" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-white">{aluno?.nome_completo || 'Sem Nome'}</h1>
@@ -268,7 +254,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         {/* Tabs */}
         <div className="flex gap-1 mt-8 mb-6 border-b border-[#585759]/30">
           {[
-            { id: 'perfil', label: 'Visão Geral', icon: <User className="w-4 h-4" /> },
+            { id: 'perfil', label: 'Visão Geral', icon: <UserIcon className="w-4 h-4" /> },
             { id: 'treinos', label: 'Treinos', icon: <Dumbbell className="w-4 h-4" /> },
             { id: 'evolucao', label: 'Evolução', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> },
             { id: 'financeiro', label: 'Financeiro', icon: <CreditCard className="w-4 h-4" /> }
@@ -295,7 +281,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
               <Card className="bg-[#0D0D0D] border-[#585759]/50">
                 <CardHeader>
                   <CardTitle className="text-white text-lg flex items-center gap-2">
-                    <User className="w-5 h-5 text-[#F2B705]" /> Dados Cadastrais
+                    <UserIcon className="w-5 h-5 text-[#F2B705]" /> Dados Cadastrais
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">

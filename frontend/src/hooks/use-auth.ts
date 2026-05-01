@@ -1,72 +1,65 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { onAuthStateChanged, type User } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
+import { getPerfil, type Role } from '@/lib/firestore'
 
-export type UserRole = 'ADMIN' | 'RECEPCIONISTA' | 'ALUNO' | null
+export type UserRole = Role | null
 
 export interface UserProfile {
   id: string
   role: UserRole
   academia_id: string | null
   nome_completo: string | null
+  telefone: string | null
   avatar_url: string | null
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
 
   useEffect(() => {
-    async function getSession() {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        setUser(session.user)
-        await fetchProfile(session.user.id)
-      } else {
+    const auth = getFirebaseAuth()
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u)
+      if (!u) {
+        setProfile(null)
+        setLoading(false)
+        return
+      }
+      try {
+        const p = await getPerfil(u.uid)
+        setProfile(
+          p
+            ? {
+                id: p.id,
+                role: p.role,
+                academia_id: p.academia_id,
+                nome_completo: p.nome_completo,
+                telefone: p.telefone ?? null,
+                avatar_url: p.avatar_url,
+              }
+            : null
+        )
+      } catch (e) {
+        console.error('Erro ao buscar perfil:', e)
+        setProfile(null)
+      } finally {
         setLoading(false)
       }
-
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (_event, session) => {
-          if (session) {
-            setUser(session.user)
-            await fetchProfile(session.user.id)
-          } else {
-            setUser(null)
-            setProfile(null)
-            setLoading(false)
-          }
-        }
-      )
-
-      return () => subscription.unsubscribe()
-    }
-
-    getSession()
+    })
+    return () => unsub()
   }, [])
 
-  async function fetchProfile(userId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', userId)
-        .single()
-
-      if (error) throw error
-
-      setProfile(data)
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error)
-    } finally {
-      setLoading(false)
-    }
+  return {
+    user,
+    profile,
+    loading,
+    isAdmin: profile?.role === 'ADMIN',
+    isReceptionist: profile?.role === 'RECEPCIONISTA',
+    isStudent: profile?.role === 'ALUNO',
   }
-
-  return { user, profile, loading, isAdmin: profile?.role === 'ADMIN', isReceptionist: profile?.role === 'RECEPCIONISTA', isStudent: profile?.role === 'ALUNO' }
 }

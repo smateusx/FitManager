@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { signOut } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
+import {
+  getPerfil,
+  insertRegistroCarga,
+  listFichasByAluno,
+  listMatriculasByAluno,
+} from '@/lib/firestore'
 import { 
   Dumbbell, 
   ChevronDown, 
@@ -57,43 +64,26 @@ export default function MeuTreinoPage() {
 
   useEffect(() => {
     async function loadData() {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
+      const u = getFirebaseAuth().currentUser
+
+      if (!u) {
         router.push('/login')
         return
       }
 
-      // Buscar perfil para pegar nome e academia_id
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
+      const perfil = await getPerfil(u.uid)
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserAvatar(perfil.avatar_url)
-        setUserId(session.user.id)
+        setUserId(u.uid)
         setPerfilData(perfil)
       }
 
-      // Buscar as fichas de treino do aluno
-      const { data: fichasData } = await supabase
-        .from('fichas_treino')
-        .select('*, exercicios(*)')
-        .eq('aluno_id', session.user.id)
-        .order('criado_em', { ascending: false })
-
+      const fichasData = await listFichasByAluno(u.uid)
       setFichas((fichasData as any) ?? [])
 
-      // Buscar histórico de matrículas
-      const { data: matriculasData } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor, duracao_dias)')
-        .eq('aluno_id', session.user.id)
-        .order('data_vencimento', { ascending: false })
-
+      const matriculasData = await listMatriculasByAluno(u.uid)
       setMatriculas(matriculasData || [])
       setLoading(false)
     }
@@ -102,7 +92,7 @@ export default function MeuTreinoPage() {
   }, [router])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut(getFirebaseAuth())
     router.push('/login')
   }
 
@@ -111,17 +101,13 @@ export default function MeuTreinoPage() {
     
     setIsSaving(true)
     try {
-      const { error } = await supabase
-        .from('registros_carga')
-        .insert({
-          aluno_id: userId,
-          exercicio_id: ex.id,
-          carga: cargaValue,
-          repeticoes: parseInt(repsValue),
-          data_registro: new Date().toISOString()
-        })
-
-      if (error) throw error
+      await insertRegistroCarga({
+        aluno_id: userId,
+        exercicio_id: ex.id,
+        carga: cargaValue,
+        repeticoes: parseInt(repsValue),
+        data_registro: new Date().toISOString(),
+      })
       
       setRegisteringId(null)
       setCargaValue('')
