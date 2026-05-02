@@ -9,23 +9,40 @@ type Props = {
   alunoId: string
 }
 
+type ChartPoint = {
+  data: string
+  carga: number
+  data_registro: string
+}
+
 export function EvolutionChart({ exercicioId, alunoId }: Props) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchData = async () => {
       const registros = await listRegistrosCarga(alunoId, exercicioId)
-      const formatted = (registros || []).map((r: any) => ({
-        ...r,
-        data: new Date(r.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-        carga: Number(r.carga),
-      }))
-      setData(formatted)
-      setLoading(false)
+      const formatted: ChartPoint[] = (registros || []).map((r) => {
+        const row = r as { data_registro?: string; carga?: string | number }
+        const raw = row.data_registro ?? ''
+        return {
+          data_registro: raw,
+          data: new Date(raw).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          carga: Number(row.carga ?? 0),
+        }
+      })
+      if (!cancelled) {
+        setData(formatted)
+        setLoading(false)
+      }
     }
 
-    fetchData()
+    void fetchData()
+    return () => {
+      cancelled = true
+    }
   }, [exercicioId, alunoId])
 
   if (loading)

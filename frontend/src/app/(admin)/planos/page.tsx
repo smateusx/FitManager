@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getFirebaseAuth } from '@/lib/firebase'
 import {
@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, X, CreditCard, Users, TrendingUp, AlertCircle } from 'lucide-react'
+import { Plus, X, Users, TrendingUp, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 
 type Plano = {
@@ -48,7 +48,7 @@ const STATUS_COLORS = {
 }
 
 export default function PlanosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [tab, setTab] = useState<'matriculas' | 'planos'>('matriculas')
   const [planos, setPlanos] = useState<Plano[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
@@ -73,12 +73,7 @@ export default function PlanosPage() {
 
   const router = useRouter()
 
-  useEffect(() => {
-    if (authLoading) return
-    fetchAll()
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     const u = getFirebaseAuth().currentUser
     if (!u) {
@@ -106,7 +101,14 @@ export default function PlanosPage() {
     setMatriculas(matriculasData as unknown as Matricula[])
     setAlunos(alunosData)
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAll()
+    })
+  }, [authLoading, fetchAll])
 
   const calcVencimento = (planoId: string, inicio: string) => {
     const plano = planos.find((p) => p.id === planoId)
