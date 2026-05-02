@@ -37,10 +37,18 @@ export default function AlunoPerfilPage() {
           router.push('/login')
           return
         }
+        if (!u.emailVerified) {
+          router.push('/verificar-email')
+          return
+        }
         if (cancelled) return
         setUserId(u.uid)
 
         const data = await getPerfil(u.uid)
+        if (!data?.cpf) {
+          router.push('/completar-cadastro')
+          return
+        }
         if (!data || cancelled) return
 
         setPerfil(data)

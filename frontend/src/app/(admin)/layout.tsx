@@ -12,18 +12,27 @@ import { Menu, X } from 'lucide-react'
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { profile, loading, isAdmin, isReceptionist } = useAuth()
+  const { profile, user, loading, isAdmin, isReceptionist } = useAuth()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
-    if (!loading && !profile) {
+    if (loading) return
+    if (!user) {
       router.push('/login')
+      return
     }
-    // Redirecionar alunos que tentarem acessar a dashboard administrativa
-    if (!loading && profile?.role === 'ALUNO') {
+    if (!user.emailVerified) {
+      router.push('/verificar-email')
+      return
+    }
+    if (!profile?.cpf) {
+      router.push('/completar-cadastro')
+      return
+    }
+    if (profile.role === 'ALUNO') {
       router.push('/meu-treino')
     }
-  }, [loading, profile, router])
+  }, [loading, profile, user, router])
 
   const navItems = [
     { href: '/dashboard', label: 'Início', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
@@ -41,8 +50,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!profile || profile.role === 'ALUNO') {
-    return null // O useEffect lidará com o redirecionamento
+  if (!profile || profile.role === 'ALUNO' || !profile.cpf) {
+    return null
   }
 
   const sidebar = (

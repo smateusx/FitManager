@@ -8,6 +8,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -26,6 +27,13 @@ function tsToIso(v: unknown): string {
   return new Date().toISOString()
 }
 
+export class CpfAlreadyRegisteredError extends Error {
+  constructor(message = 'Este CPF já está cadastrado em outra conta.') {
+    super(message)
+    this.name = 'CpfAlreadyRegisteredError'
+  }
+}
+
 export async function getPerfil(userId: string) {
   const snap = await getDoc(doc(getDb(), 'perfis', userId))
   if (!snap.exists()) return null
@@ -36,6 +44,7 @@ export async function getPerfil(userId: string) {
     academia_id: d.academia_id ?? null,
     nome_completo: d.nome_completo ?? null,
     telefone: d.telefone ?? null,
+    cpf: (d.cpf as string | undefined) ?? null,
     created_at: tsToIso(d.created_at),
   }
 }
@@ -47,6 +56,7 @@ export async function setPerfil(
     role: Role
     nome_completo: string | null
     telefone: string | null
+    cpf: string | null
   }>
 ) {
   await setDoc(
@@ -56,33 +66,51 @@ export async function setPerfil(
   )
 }
 
-export async function createAdminPerfil(
-  userId: string,
-  nome: string,
-  academiaId: string
-) {
-  await setDoc(doc(getDb(), 'perfis', userId), {
-    nome_completo: nome,
-    role: 'ADMIN',
-    academia_id: academiaId,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp(),
-  })
-}
-
-export async function createAlunoPerfil(
-  userId: string,
-  nome: string,
-  academiaId: string,
+/**
+ * Garante 1 CPF = 1 conta (documento cpf_claims/{cpf11} com user_id).
+ * Usar após createUserWithEmailAndPassword ou signInWithPopup (Google).
+ */
+export async function registerPerfilAndClaimCpf(params: {
+  userId: string
+  cpfDigits: string
+  nome_completo: string
+  role: Role
+  academia_id: string
   telefone?: string | null
-) {
-  await setDoc(doc(getDb(), 'perfis', userId), {
-    nome_completo: nome,
-    role: 'ALUNO',
-    academia_id: academiaId,
-    telefone: telefone ?? null,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp(),
+}): Promise<void> {
+  const { userId, cpfDigits, nome_completo, role, academia_id, telefone } = params
+  const db = getDb()
+  const claimRef = doc(db, 'cpf_claims', cpfDigits)
+  const perfilRef = doc(db, 'perfis', userId)
+  await runTransaction(db, async (tx) => {
+    const claimSnap = await tx.get(claimRef)
+    if (claimSnap.exists()) {
+      const owner = claimSnap.data()?.user_id as string | undefined
+      if (owner && owner !== userId) throw new CpfAlreadyRegisteredError()
+    }
+    const perfilSnap = await tx.get(perfilRef)
+    if (perfilSnap.exists()) {
+      const oldCpf = perfilSnap.data()?.cpf as string | undefined
+      if (oldCpf && oldCpf !== cpfDigits) {
+        throw new CpfAlreadyRegisteredError(
+          'Este perfil já está vinculado a outro CPF. Não é possível usar um CPF diferente.'
+        )
+      }
+    }
+    tx.set(claimRef, { user_id: userId, created_at: serverTimestamp() })
+    tx.set(
+      perfilRef,
+      {
+        nome_completo,
+        role,
+        academia_id,
+        telefone: telefone ?? null,
+        cpf: cpfDigits,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      },
+      { merge: true }
+    )
   })
 }
 

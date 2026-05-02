@@ -5,21 +5,27 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+  updateProfile,
+} from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { createAcademia, createAdminPerfil } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
-import { Building2 } from 'lucide-react'
+import { Building2, Mail } from 'lucide-react'
 
 export default function RegisterPage() {
   const [gymName, setGymName] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [sent, setSent] = useState(false)
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -27,15 +33,34 @@ export default function RegisterPage() {
     setLoading(true)
     setErrorMsg('')
 
+    if (password !== passwordConfirm) {
+      setErrorMsg('As senhas não coincidem.')
+      setLoading(false)
+      return
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.')
+      setLoading(false)
+      return
+    }
+
     try {
       const auth = getFirebaseAuth()
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
       await updateProfile(cred.user, { displayName: fullName.trim() })
 
-      const gymId = await createAcademia(gymName.trim())
-      await createAdminPerfil(cred.user.uid, fullName.trim(), gymId)
+      await sendEmailVerification(cred.user)
 
-      router.push('/dashboard')
+      try {
+        sessionStorage.setItem('fitmanager_pending_academy_name', gymName.trim())
+        sessionStorage.setItem('fitmanager_register_intent', 'admin')
+      } catch {
+        /* ignore */
+      }
+
+      await signOut(auth)
+      setSent(true)
     } catch (err: unknown) {
       const code =
         err && typeof err === 'object' && 'code' in err && typeof (err as { code: string }).code === 'string'
@@ -54,6 +79,35 @@ export default function RegisterPage() {
     }
   }
 
+  if (sent) {
+    return (
+      <AuthShell variant="wide">
+        <Card className="w-full border-emerald-500/25 bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
+          <CardHeader className="space-y-2 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+              <Mail className="h-7 w-7" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-white">Verifique seu e-mail</CardTitle>
+            <CardDescription className="text-[#A6A6A6]">
+              Abra a mensagem que enviamos para <span className="font-medium text-white">{email.trim()}</span>, clique
+              no link e depois faça login para continuar o cadastro da academia (nome da unidade e CPF).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              type="button"
+              className="h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] hover:bg-[#BF9004]"
+              onClick={() => router.push('/login')}
+            >
+              Ir para o login
+            </Button>
+            <p className="text-center text-xs text-[#585759]">Não viu o e-mail? Confira spam e lixo eletrônico.</p>
+          </CardContent>
+        </Card>
+      </AuthShell>
+    )
+  }
+
   return (
     <AuthShell variant="wide">
       <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
@@ -63,7 +117,7 @@ export default function RegisterPage() {
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Cadastre sua academia</CardTitle>
           <CardDescription className="text-[#A6A6A6]">
-            Crie a conta de administrador e comece a usar o painel. Os dados ficam no Firebase (Auth + Firestore).
+            Criamos sua conta com Firebase Auth. Você confirma o e-mail, faz login e completa CPF e dados da unidade.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -75,7 +129,7 @@ export default function RegisterPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="gymName" className="text-[#A6A6A6]">
-                Nome da academia
+                Nome da academia (para depois do login)
               </Label>
               <Input
                 id="gymName"
@@ -100,7 +154,7 @@ export default function RegisterPage() {
               />
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="email" className="text-[#A6A6A6]">
                   E-mail
                 </Label>
@@ -131,13 +185,29 @@ export default function RegisterPage() {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="passwordConfirm" className="text-[#A6A6A6]">
+                  Confirmar senha
+                </Label>
+                <Input
+                  id="passwordConfirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Repita a senha"
+                  minLength={6}
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <Button
               type="submit"
               className="mt-2 h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
               disabled={loading}
             >
-              {loading ? 'Criando conta...' : 'Criar conta'}
+              {loading ? 'Criando conta...' : 'Criar conta e enviar e-mail'}
             </Button>
           </form>
         </CardContent>

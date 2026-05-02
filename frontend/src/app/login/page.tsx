@@ -5,12 +5,18 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
 import { Dumbbell } from 'lucide-react'
+import { resolvePostLoginPath } from '@/lib/post-login'
 
 function firebaseAuthMessage(err: unknown): string {
   const code =
@@ -26,13 +32,22 @@ function firebaseAuthMessage(err: unknown): string {
   if (code === 'auth/network-request-failed') {
     return 'Sem conexão. Verifique a internet.'
   }
+  if (code === 'auth/popup-closed-by-user') {
+    return 'Login cancelado.'
+  }
+  if (code === 'auth/account-exists-with-different-credential') {
+    return 'Já existe uma conta com este e-mail usando outro método. Entre com e-mail e senha.'
+  }
   return 'Não foi possível entrar. Verifique os dados e tente novamente.'
 }
+
+const googleProvider = new GoogleAuthProvider()
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
   const [resetMsg, setResetMsg] = useState<string | null>(null)
   const router = useRouter()
@@ -44,12 +59,30 @@ export default function LoginPage() {
     setResetMsg(null)
 
     try {
-      await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
-      router.push('/dashboard')
+      const cred = await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
+      await cred.user.reload()
+      const path = await resolvePostLoginPath(cred.user)
+      router.push(path)
     } catch (err) {
       setErrorMsg(firebaseAuthMessage(err))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    setErrorMsg('')
+    setResetMsg(null)
+    try {
+      const cred = await signInWithPopup(getFirebaseAuth(), googleProvider)
+      await cred.user.reload()
+      const path = await resolvePostLoginPath(cred.user)
+      router.push(path)
+    } catch (err) {
+      setErrorMsg(firebaseAuthMessage(err))
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -78,10 +111,24 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Bem-vindo de volta</CardTitle>
           <CardDescription className="text-[#A6A6A6]">
-            Entre com a conta da academia para abrir o painel. Alunos usam o mesmo login e vão para o portal de treino.
+            Entre com e-mail ou Google. Novos utilizadores com Google confirmam o e-mail automaticamente; depois pedimos CPF
+            e dados da conta.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full border-[#585759] bg-white text-[#0D0D0D] hover:bg-[#f3f3f3]"
+            onClick={handleGoogle}
+            disabled={loading || googleLoading}
+          >
+            {googleLoading ? 'Abrindo Google…' : 'Continuar com Google'}
+          </Button>
+          <div className="relative py-1 text-center text-xs text-[#585759]">
+            <span className="relative z-10 bg-[#0D0D0D]/90 px-2">ou e-mail e senha</span>
+            <div className="absolute left-0 right-0 top-1/2 border-t border-[#585759]/40" />
+          </div>
           <form onSubmit={handleLogin} className="space-y-4">
             {errorMsg && (
               <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
@@ -135,7 +182,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               className="h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
-              disabled={loading}
+              disabled={loading || googleLoading}
             >
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>

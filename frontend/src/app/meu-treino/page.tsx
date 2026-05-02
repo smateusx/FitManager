@@ -71,7 +71,16 @@ export default function MeuTreinoPage() {
         return
       }
 
+      if (!u.emailVerified) {
+        router.push('/verificar-email')
+        return
+      }
+
       const perfil = await getPerfil(u.uid)
+      if (!perfil?.cpf) {
+        router.push('/completar-cadastro')
+        return
+      }
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { updatePassword } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
@@ -26,18 +27,31 @@ export default function PerfilPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
+  const router = useRouter()
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
         const u = getFirebaseAuth().currentUser
-        if (!u || cancelled) return
+        if (!u || cancelled) {
+          router.replace('/login')
+          return
+        }
+        if (!u.emailVerified) {
+          router.replace('/verificar-email')
+          return
+        }
 
         setUserId(u.uid)
         setUserEmail(u.email ?? null)
 
         const data = await getPerfil(u.uid)
-        if (!data || cancelled) return
+        if (cancelled) return
+        if (!data?.cpf) {
+          router.replace('/completar-cadastro')
+          return
+        }
 
         setPerfil(data)
         setNome(data.nome_completo || '')
@@ -51,7 +65,7 @@ export default function PerfilPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [router])
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()

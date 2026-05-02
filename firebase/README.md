@@ -17,9 +17,16 @@ Na **raiz do repositório** (pasta que contém `firebase.json`):
    firebase deploy --only firestore:indexes
    ```
 
-Os índices podem ficar vários minutos em **Building** na consola até **Enabled**.
+## Autenticação (Firebase Console)
 
-## Rules
+- **Verificação de e-mail**: em Authentication → **Settings** → ative **Prevent user enumeration** se desejar (recomendado em produção).
+- **Google**: Authentication → **Sign-in method** → ative **Google** e configure o suporte a e-mail (consent screen no Google Cloud se necessário).
+- Domínios autorizados: em Authentication → **Settings** → **Authorized domains**, inclua o domínio Vercel (ex.: `fitmanager-web.vercel.app`).
+
+## Firestore — CPF único
+
+A app usa a coleção `cpf_claims` com ID = 11 dígitos do CPF (um documento por CPF). Novos deploys de índice não são obrigatórios para isso.
+
 
 ```bash
 firebase deploy --only firestore:rules
