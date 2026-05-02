@@ -13,6 +13,7 @@ import {
   sendEmailVerification,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
+import { seedAlunoInviteProfile } from '@/lib/firestore'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
 import { CheckCircle2, Mail } from 'lucide-react'
@@ -64,6 +65,12 @@ function RegisterAlunoForm() {
       const auth = getFirebaseAuth()
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
       await updateProfile(cred.user, { displayName: fullName.trim() })
+      await seedAlunoInviteProfile({
+        userId: cred.user.uid,
+        academia_id: academiaId,
+        nome_completo: fullName.trim() || null,
+        telefone: phone.trim() || null,
+      })
       await sendEmailVerification(cred.user)
       try {
         sessionStorage.setItem('fitmanager_pending_phone', phone.trim())
