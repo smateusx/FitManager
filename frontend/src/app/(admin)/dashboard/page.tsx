@@ -31,6 +31,14 @@ type RecentActivity = {
   data: string
 }
 
+type RecentMatriculaRow = Awaited<ReturnType<typeof matriculasRecentes>>[number]
+type MatriculaMesRow = {
+  status?: string
+  valor_pago?: number | null
+}
+
+type MatriculaExportRow = Awaited<ReturnType<typeof matriculasTodas>>[number]
+
 export default function DashboardPage() {
   const { profile, loading: authLoading, isReceptionist } = useAuth()
   const academiaId = profile?.academia_id
@@ -62,16 +70,16 @@ export default function DashboardPage() {
 
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const matriculasMes = await matriculasCriadasDesde(academiaId, startOfMonth)
+        const matriculasMes = (await matriculasCriadasDesde(academiaId, startOfMonth)) as MatriculaMesRow[]
 
         const receita = (matriculasMes || [])
-          .filter((m: any) => m.status === 'ATIVO' && m.valor_pago)
-          .reduce((sum, m: any) => sum + Number(m.valor_pago), 0)
+          .filter((m) => m.status === 'ATIVO' && m.valor_pago)
+          .reduce((sum, m) => sum + Number(m.valor_pago), 0)
 
-        const vencimentos = (matriculasMes || []).filter((m: any) => m.status === 'VENCIDO').length
+        const vencimentos = (matriculasMes || []).filter((m) => m.status === 'VENCIDO').length
 
         const recentData = await matriculasRecentes(academiaId, 5)
-        const formattedActivities = (recentData || []).map((m: any) => ({
+        const formattedActivities = (recentData || []).map((m: RecentMatriculaRow) => ({
           id: m.id,
           aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
           plano_nome: m.planos?.nome || 'Plano Personalizado',
@@ -110,12 +118,12 @@ export default function DashboardPage() {
       const allMatriculas = await matriculasTodas(academiaId)
 
       const columns = ['Aluno', 'Plano', 'Valor', 'Data', 'Status']
-      const rows = (allMatriculas || []).map((m: any) => [
-        m.perfis?.nome_completo || 'N/A',
-        m.planos?.nome || 'Personalizado',
+      const rows = (allMatriculas || []).map((m: MatriculaExportRow) => [
+        String(m.perfis?.nome_completo ?? 'N/A'),
+        String(m.planos?.nome ?? 'Personalizado'),
         `R$ ${Number(m.valor_pago || 0).toFixed(2)}`,
         new Date(m.criado_em).toLocaleDateString('pt-BR'),
-        m.status
+        String(m.status ?? ''),
       ])
 
       ReportsService.exportToPDF(
@@ -136,12 +144,12 @@ export default function DashboardPage() {
       if (!academiaId) return
       const allMatriculas = await matriculasTodas(academiaId)
 
-      const formattedData = (allMatriculas || []).map((m: any) => ({
-        'Aluno': m.perfis?.nome_completo,
-        'Plano': m.planos?.nome,
+      const formattedData = (allMatriculas || []).map((m: MatriculaExportRow) => ({
+        Aluno: m.perfis?.nome_completo ?? '',
+        Plano: m.planos?.nome ?? '',
         'Valor (R$)': Number(m.valor_pago || 0),
-        'Data': new Date(m.criado_em).toLocaleDateString('pt-BR'),
-        'Status': m.status
+        Data: new Date(m.criado_em).toLocaleDateString('pt-BR'),
+        Status: m.status ?? '',
       }))
 
       ReportsService.exportToExcel(

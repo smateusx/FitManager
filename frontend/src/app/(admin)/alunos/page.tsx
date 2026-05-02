@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -17,19 +17,14 @@ type Aluno = {
 }
 
 export default function AlunosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading } = useAuth()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [loading, setLoading] = useState(true)
   const [academiaId, setAcademiaId] = useState<string | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (authLoading) return
-    fetchAlunos()
-  }, [authLoading])
-
-  const fetchAlunos = async () => {
+  const fetchAlunos = useCallback(async () => {
     setLoading(true)
     const u = getFirebaseAuth().currentUser
     if (!u) return
@@ -42,7 +37,14 @@ export default function AlunosPage() {
     }
 
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAlunos()
+    })
+  }, [authLoading, fetchAlunos])
 
   const inviteLink = academiaId ? `${window.location.origin}/register/aluno?academia_id=${academiaId}` : ''
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { vencimentosProximos } from '@/lib/firestore'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import {
@@ -10,7 +10,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  ExternalLink,
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -33,16 +32,7 @@ export default function CobrancasPage() {
   const [vencimentos, setVencimentos] = useState<Vencimento[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!profile?.academia_id) {
-      setLoading(false)
-      return
-    }
-    fetchVencimentos()
-  }, [authLoading, profile?.academia_id])
-
-  async function fetchVencimentos() {
+  const fetchVencimentos = useCallback(async () => {
     if (!profile?.academia_id) return
     try {
       setLoading(true)
@@ -53,7 +43,16 @@ export default function CobrancasPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [profile?.academia_id])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!profile?.academia_id) {
+      setLoading(false)
+      return
+    }
+    void fetchVencimentos()
+  }, [authLoading, profile?.academia_id, fetchVencimentos])
 
   const filteredVencimentos = vencimentos.filter(
     (v) =>
