@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { updatePassword } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
+import { userInitials } from '@/lib/user-initials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AvatarUpload } from '@/components/avatar-upload'
 import { Shield, Smartphone, User, Lock, Save, Loader2, CheckCircle2 } from 'lucide-react'
+
+type PerfilDoc = NonNullable<Awaited<ReturnType<typeof getPerfil>>>
 
 export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
@@ -17,7 +19,7 @@ export default function PerfilPage() {
 
   const [userId, setUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [perfil, setPerfil] = useState<any>(null)
+  const [perfil, setPerfil] = useState<PerfilDoc | null>(null)
 
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -25,29 +27,31 @@ export default function PerfilPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    let cancelled = false
+    void (async () => {
+      try {
+        const u = getFirebaseAuth().currentUser
+        if (!u || cancelled) return
 
-  async function fetchProfile() {
-    try {
-      const u = getFirebaseAuth().currentUser
-      if (!u) return
+        setUserId(u.uid)
+        setUserEmail(u.email ?? null)
 
-      setUserId(u.uid)
-      setUserEmail(u.email ?? null)
+        const data = await getPerfil(u.uid)
+        if (!data || cancelled) return
 
-      const data = await getPerfil(u.uid)
-      if (!data) return
-
-      setPerfil(data)
-      setNome(data.nome_completo || '')
-      setTelefone(data.telefone || '')
-    } catch (err) {
-      console.error('Erro ao carregar perfil:', err)
-    } finally {
-      setLoading(false)
+        setPerfil(data)
+        setNome(data.nome_completo || '')
+        setTelefone(data.telefone || '')
+      } catch (err) {
+        console.error('Erro ao carregar perfil:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-  }
+  }, [])
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
@@ -96,20 +100,6 @@ export default function PerfilPage() {
     }
   }
 
-  async function handleAvatarUpload(url: string) {
-    if (!userId) return
-    try {
-      await savePerfilDoc(userId, { avatar_url: url })
-
-      setPerfil({ ...perfil, avatar_url: url })
-      setSuccess('Foto de perfil atualizada!')
-      setTimeout(() => setSuccess(null), 3000)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro'
-      alert('Erro ao salvar URL do avatar: ' + msg)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0D0D0D]">
@@ -119,7 +109,7 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
         <header className="pb-8 border-b border-[#585759]/30 mb-8">
           <h1 className="text-3xl font-bold text-[#F2B705]">Configurações de Perfil</h1>
@@ -135,8 +125,18 @@ export default function PerfilPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-            <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl sticky top-8">
-              {userId && <AvatarUpload uid={userId} url={perfil?.avatar_url} onUpload={handleAvatarUpload} />}
+            <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl lg:sticky lg:top-8">
+              <div className="flex flex-col items-center text-center">
+                <div
+                  className="w-24 h-24 rounded-full bg-[#F2B705]/15 border-2 border-[#F2B705]/40 flex items-center justify-center text-2xl font-black text-[#F2B705]"
+                  aria-hidden
+                >
+                  {userInitials(nome || perfil?.nome_completo)}
+                </div>
+                <p className="mt-4 text-xs text-[#A6A6A6] max-w-[14rem]">
+                  Perfil sem upload de imagens — apenas iniciais, para manter o sistema simples.
+                </p>
+              </div>
 
               <div className="mt-8 space-y-4">
                 <div className="p-4 bg-[#585759]/10 rounded-2xl border border-[#585759]/20">

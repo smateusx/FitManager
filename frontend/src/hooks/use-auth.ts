@@ -13,7 +13,6 @@ export interface UserProfile {
   academia_id: string | null
   nome_completo: string | null
   telefone: string | null
-  avatar_url: string | null
 }
 
 export function useAuth() {
@@ -40,7 +39,6 @@ export function useAuth() {
                 academia_id: p.academia_id,
                 nome_completo: p.nome_completo,
                 telefone: p.telefone ?? null,
-                avatar_url: p.avatar_url,
               }
             : null
         )

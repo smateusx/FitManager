@@ -36,7 +36,6 @@ export async function getPerfil(userId: string) {
     academia_id: d.academia_id ?? null,
     nome_completo: d.nome_completo ?? null,
     telefone: d.telefone ?? null,
-    avatar_url: d.avatar_url ?? null,
     created_at: tsToIso(d.created_at),
   }
 }
@@ -48,7 +47,6 @@ export async function setPerfil(
     role: Role
     nome_completo: string | null
     telefone: string | null
-    avatar_url: string | null
   }>
 ) {
   await setDoc(

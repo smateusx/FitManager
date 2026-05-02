@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import { signOut, updatePassword } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
+import { userInitials } from '@/lib/user-initials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { AvatarUpload } from '@/components/avatar-upload'
 import { User, Lock, Save, Loader2, CheckCircle2, ChevronLeft, Smartphone, LogOut } from 'lucide-react'
+
+type PerfilDoc = NonNullable<Awaited<ReturnType<typeof getPerfil>>>
 
 export default function AlunoPerfilPage() {
   const [loading, setLoading] = useState(true)
@@ -17,7 +19,7 @@ export default function AlunoPerfilPage() {
   const [success, setSuccess] = useState<string | null>(null)
 
   const [userId, setUserId] = useState<string | null>(null)
-  const [perfil, setPerfil] = useState<any>(null)
+  const [perfil, setPerfil] = useState<PerfilDoc | null>(null)
 
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -27,30 +29,33 @@ export default function AlunoPerfilPage() {
   const router = useRouter()
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    let cancelled = false
+    void (async () => {
+      try {
+        const u = getFirebaseAuth().currentUser
+        if (!u) {
+          router.push('/login')
+          return
+        }
+        if (cancelled) return
+        setUserId(u.uid)
 
-  async function fetchProfile() {
-    try {
-      const u = getFirebaseAuth().currentUser
-      if (!u) {
-        router.push('/login')
-        return
+        const data = await getPerfil(u.uid)
+        if (!data || cancelled) return
+
+        setPerfil(data)
+        setNome(data.nome_completo || '')
+        setTelefone(data.telefone || '')
+      } catch (err) {
+        console.error('Erro ao carregar perfil:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setUserId(u.uid)
-
-      const data = await getPerfil(u.uid)
-      if (!data) return
-
-      setPerfil(data)
-      setNome(data.nome_completo || '')
-      setTelefone(data.telefone || '')
-    } catch (err) {
-      console.error('Erro ao carregar perfil:', err)
-    } finally {
-      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
     }
-  }
+  }, [router])
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
@@ -99,20 +104,6 @@ export default function AlunoPerfilPage() {
     }
   }
 
-  async function handleAvatarUpload(url: string) {
-    if (!userId) return
-    try {
-      await savePerfilDoc(userId, { avatar_url: url })
-
-      setPerfil({ ...perfil, avatar_url: url })
-      setSuccess('Foto de perfil atualizada!')
-      setTimeout(() => setSuccess(null), 3000)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro'
-      alert('Erro ao salvar URL do avatar: ' + msg)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0D0D0D]">
@@ -158,12 +149,20 @@ export default function AlunoPerfilPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-1 flex flex-col items-center">
-            {userId && <AvatarUpload uid={userId} url={perfil?.avatar_url} onUpload={handleAvatarUpload} />}
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
+          <aside className="lg:col-span-1">
+            <div className="rounded-2xl border border-[#585759]/30 bg-[#0D0D0D]/60 p-8 flex flex-col items-center text-center">
+              <div
+                className="w-24 h-24 rounded-full bg-[#F2B705]/15 border-2 border-[#F2B705]/40 flex items-center justify-center text-2xl font-black text-[#F2B705] tracking-tight"
+                aria-hidden
+              >
+                {userInitials(nome || perfil?.nome_completo)}
+              </div>
+              <p className="mt-4 text-sm text-[#A6A6A6]">Sua conta usa iniciais no lugar de foto.</p>
+            </div>
+          </aside>
 
-          <div className="lg:col-span-2 space-y-10">
+          <div className="lg:col-span-2 space-y-8 lg:space-y-10">
             <form onSubmit={handleUpdateProfile} className="space-y-6 p-6 border border-[#585759]/30 rounded-2xl bg-[#0D0D0D]/50">
               <div className="flex items-center gap-3 mb-2">
                 <User className="w-5 h-5 text-[#F2B705]" />

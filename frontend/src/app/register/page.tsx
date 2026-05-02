@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -10,6 +10,8 @@ import { getFirebaseAuth } from '@/lib/firebase'
 import { createAcademia, createAdminPerfil } from '@/lib/firestore'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { AuthShell } from '@/components/auth-shell'
+import { Building2 } from 'lucide-react'
 
 export default function RegisterPage() {
   const [gymName, setGymName] = useState('')
@@ -17,91 +19,113 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setErrorMsg('')
 
     try {
       const auth = getFirebaseAuth()
-      const cred = await createUserWithEmailAndPassword(auth, email, password)
-      await updateProfile(cred.user, { displayName: fullName })
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
+      await updateProfile(cred.user, { displayName: fullName.trim() })
 
-      const gymId = await createAcademia(gymName)
-      await createAdminPerfil(cred.user.uid, fullName, gymId)
+      const gymId = await createAcademia(gymName.trim())
+      await createAdminPerfil(cred.user.uid, fullName.trim(), gymId)
 
-      alert('Conta de academia criada com sucesso!')
       router.push('/dashboard')
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
-      alert('Erro ao criar conta: ' + msg)
+      const code =
+        err && typeof err === 'object' && 'code' in err && typeof (err as { code: string }).code === 'string'
+          ? (err as { code: string }).code
+          : ''
+      if (code === 'auth/email-already-in-use') {
+        setErrorMsg('Este e-mail já está em uso. Faça login ou use outro endereço.')
+      } else if (code === 'auth/weak-password') {
+        setErrorMsg('Use uma senha mais forte (pelo menos 6 caracteres).')
+      } else {
+        const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+        setErrorMsg('Não foi possível criar a conta: ' + msg)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-1/4 w-[600px] h-[400px] bg-[#BF9004]/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-[500px] h-[300px] bg-[#F2B705]/10 blur-[100px] rounded-full pointer-events-none" />
-
-      <Card className="w-full max-w-lg border-[#585759] bg-[#0D0D0D]/80 backdrop-blur-xl shadow-2xl z-10">
-        <CardHeader className="space-y-2 text-center pb-6">
-          <div className="mx-auto w-12 h-12 bg-[#F2B705] rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-[#F2B705]/20">
-            <svg className="w-6 h-6 text-[#0D0D0D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+    <AuthShell variant="wide">
+      <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
+        <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#F2B705] shadow-lg shadow-[#F2B705]/20 sm:mx-0">
+            <Building2 className="h-6 w-6 text-[#0D0D0D]" aria-hidden />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-white">Cadastre sua Academia</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Cadastre sua academia</CardTitle>
           <CardDescription className="text-[#A6A6A6]">
-            Crie sua conta administrativa e comece a gerenciar seus alunos com o FitManager.
+            Crie a conta de administrador e comece a usar o painel. Os dados ficam no Firebase (Auth + Firestore).
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-5">
+            {errorMsg && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+                {errorMsg}
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="gymName" className="text-[#A6A6A6]">Nome da Academia</Label>
+              <Label htmlFor="gymName" className="text-[#A6A6A6]">
+                Nome da academia
+              </Label>
               <Input
                 id="gymName"
-                placeholder="Ex: FitTech GYM"
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                placeholder="Ex.: FitTech Gym"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={gymName}
                 onChange={(e) => setGymName(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#A6A6A6]">Seu Nome Completo</Label>
+              <Label htmlFor="fullName" className="text-[#A6A6A6]">
+                Seu nome completo
+              </Label>
               <Input
                 id="fullName"
                 placeholder="João Silva"
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-[#A6A6A6]">E-mail Comercial</Label>
+                <Label htmlFor="email" className="text-[#A6A6A6]">
+                  E-mail
+                </Label>
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="admin@academia.com"
-                  className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-[#A6A6A6]">Senha</Label>
+                <Label htmlFor="password" className="text-[#A6A6A6]">
+                  Senha (mín. 6 caracteres)
+                </Label>
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   placeholder="••••••••"
-                  className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                  minLength={6}
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -110,22 +134,25 @@ export default function RegisterPage() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold transition-all shadow-lg shadow-[#F2B705]/20 mt-2"
+              className="mt-2 h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
               disabled={loading}
             >
-              {loading ? 'Criando conta...' : 'Criar minha conta gratuita'}
+              {loading ? 'Criando conta...' : 'Criar conta'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4 pt-4 border-t border-[#585759]/50 mt-4">
-          <div className="text-sm text-center text-[#A6A6A6]">
-            Já possui uma conta?{' '}
-            <Link href="/login" className="font-semibold text-[#F2B705] hover:text-[#BF9004] transition-colors">
-              Fazer login
+        <CardFooter className="flex flex-col space-y-3 border-t border-[#585759]/50 pt-4">
+          <p className="text-center text-sm text-[#A6A6A6]">
+            Já tem conta?{' '}
+            <Link href="/login" className="font-semibold text-[#F2B705] transition-colors hover:text-[#BF9004]">
+              Entrar
             </Link>
-          </div>
+          </p>
+          <Link href="/" className="block text-center text-xs text-[#585759] transition-colors hover:text-[#A6A6A6]">
+            ← Voltar ao início
+          </Link>
         </CardFooter>
       </Card>
-    </div>
+    </AuthShell>
   )
 }

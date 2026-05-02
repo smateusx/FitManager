@@ -16,7 +16,6 @@ import {
   ChevronUp, 
   LogOut, 
   TrendingUp, 
-  User, 
   CreditCard, 
   Info, 
   MessageSquare, 
@@ -25,6 +24,7 @@ import {
 } from 'lucide-react'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
+import { userInitials } from '@/lib/user-initials'
 
 type Exercicio = {
   id: string
@@ -49,16 +49,16 @@ export default function MeuTreinoPage() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [userName, setUserName] = useState('')
-  const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [registeringId, setRegisteringId] = useState<string | null>(null)
   const [showingChartId, setShowingChartId] = useState<string | null>(null)
   const [cargaValue, setCargaValue] = useState('')
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [perfilData, setPerfilData] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
-  const [matriculas, setMatriculas] = useState<any[]>([])
+  const [matriculas, setMatriculas] = useState<
+    Awaited<ReturnType<typeof listMatriculasByAluno>>
+  >([])
 
   const router = useRouter()
 
@@ -75,13 +75,11 @@ export default function MeuTreinoPage() {
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
-        setUserAvatar(perfil.avatar_url)
         setUserId(u.uid)
-        setPerfilData(perfil)
       }
 
       const fichasData = await listFichasByAluno(u.uid)
-      setFichas((fichasData as any) ?? [])
+      setFichas((fichasData as Ficha[]) ?? [])
 
       const matriculasData = await listMatriculasByAluno(u.uid)
       setMatriculas(matriculasData || [])
@@ -148,16 +146,17 @@ export default function MeuTreinoPage() {
           <div className="flex items-center gap-4">
             <button 
               onClick={() => router.push('/meu-perfil')}
-              className="flex items-center gap-3 px-3 py-1.5 rounded-xl hover:bg-[#585759]/20 transition-all border border-transparent hover:border-[#585759]/30 group"
+              className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-xl hover:bg-[#585759]/20 transition-all border border-transparent hover:border-[#585759]/30 group min-w-0"
             >
-              <div className="w-8 h-8 rounded-full bg-[#585759]/20 flex items-center justify-center overflow-hidden border border-[#585759]/30 group-hover:border-[#F2B705]/50 transition-all">
-                {userAvatar ? (
-                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
-                )}
+              <div
+                className="w-8 h-8 rounded-full bg-[#F2B705]/15 border border-[#F2B705]/35 flex items-center justify-center text-[10px] font-bold text-[#F2B705] shrink-0"
+                aria-hidden
+              >
+                {userInitials(userName)}
               </div>
-              <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white hidden sm:inline">{userName.split(' ')[0]}</span>
+              <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white truncate hidden sm:inline max-w-[8rem]">
+                {userName.split(' ')[0]}
+              </span>
             </button>
 
             <button 

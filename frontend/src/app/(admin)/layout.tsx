@@ -1,17 +1,20 @@
 'use client'
 
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter, usePathname } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import Link from 'next/link'
+import { userInitials } from '@/lib/user-initials'
+import { Menu, X } from 'lucide-react'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const { profile, loading, isAdmin, isReceptionist } = useAuth()
-  
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
   useEffect(() => {
     if (!loading && !profile) {
       router.push('/login')
@@ -42,86 +45,145 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return null // O useEffect lidará com o redirecionamento
   }
 
-  return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white flex">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 border-r border-[#585759]/30 bg-[#0D0D0D] flex flex-col shadow-2xl z-20">
-        <div className="p-6 border-b border-[#585759]/20">
-          <h1 className="text-2xl font-black text-[#F2B705] tracking-tighter">FitManager<span className="text-white">.</span></h1>
-          {isReceptionist && (
-            <span className="text-[10px] bg-[#F2B705] text-[#0D0D0D] px-2 py-0.5 rounded font-bold uppercase tracking-wider mt-1 inline-block">Recepcionista</span>
-          )}
-          {isAdmin && (
-            <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider mt-1 inline-block">Admin</span>
-          )}
-        </div>
-        
-        <div className="px-6 py-4">
-          <p className="text-xs uppercase tracking-widest text-[#585759] font-bold">Menu Principal</p>
-        </div>
-
-        <nav className="flex-1 px-4 space-y-2 relative">
-          {navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href)
-            return (
-              <Link 
-                key={item.href} 
-                href={item.href}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive 
-                  ? 'bg-[#F2B705] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20' 
-                  : 'text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white'
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? 2.5 : 2} d={item.icon} />
-                </svg>
-                <span>{item.label}</span>
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="p-4 border-t border-[#585759]/30 space-y-2">
-          <Link 
-            href="/perfil"
-            className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-              pathname === '/perfil' 
-              ? 'bg-[#F2B705]/10 text-[#F2B705] font-bold border border-[#F2B705]/30' 
-              : 'text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white'
-            }`}
-          >
-            <div className="w-8 h-8 rounded-full bg-[#585759]/30 overflow-hidden border border-[#585759]/50">
-               {profile.avatar_url ? (
-                 <img src={profile.avatar_url} alt={profile.nome_completo || ''} className="w-full h-full object-cover" />
-               ) : (
-                 <div className="w-full h-full flex items-center justify-center text-xs font-bold text-[#A6A6A6]">
-                   {profile.nome_completo?.[0] || 'U'}
-                 </div>
-               )}
+  const sidebar = (
+    <>
+      <div className="p-5 sm:p-6 border-b border-[#585759]/20 shrink-0">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-[#F2B705] tracking-tighter">
+              FitManager<span className="text-white">.</span>
+            </h1>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {isReceptionist && (
+                <span className="text-[10px] bg-[#F2B705] text-[#0D0D0D] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                  Recepção
+                </span>
+              )}
+              {isAdmin && (
+                <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                  Admin
+                </span>
+              )}
             </div>
-            <span className="flex-1 truncate text-sm">{profile.nome_completo || 'Meu Perfil'}</span>
-          </Link>
-
-          <button 
-            onClick={async () => {
-              await signOut(getFirebaseAuth())
-              router.push('/login')
-            }}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-[#A6A6A6] hover:bg-red-500/10 hover:text-red-500 transition-colors"
+          </div>
+          <button
+            type="button"
+            className="lg:hidden p-2 rounded-lg text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Fechar menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span className="text-sm">Sair</span>
+            <X className="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      <div className="px-5 sm:px-6 py-3 shrink-0">
+        <p className="text-[11px] uppercase tracking-widest text-[#585759] font-bold">Menu</p>
+      </div>
+
+      <nav className="flex-1 px-3 sm:px-4 space-y-1 overflow-y-auto min-h-0">
+        {navItems.map((item) => {
+          const isActive = pathname.startsWith(item.href)
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setMobileNavOpen(false)}
+              className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all ${
+                isActive
+                  ? 'bg-[#F2B705] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20'
+                  : 'text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white'
+              }`}
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={isActive ? 2.5 : 2}
+                  d={item.icon}
+                />
+              </svg>
+              <span className="text-sm sm:text-base">{item.label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="p-3 sm:p-4 border-t border-[#585759]/30 space-y-1 shrink-0">
+        <Link
+          href="/perfil"
+          onClick={() => setMobileNavOpen(false)}
+          className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl transition-all ${
+            pathname === '/perfil'
+              ? 'bg-[#F2B705]/10 text-[#F2B705] font-bold border border-[#F2B705]/30'
+              : 'text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white'
+          }`}
+        >
+          <div
+            className="w-8 h-8 rounded-full bg-[#F2B705]/15 border border-[#F2B705]/35 flex items-center justify-center text-[10px] font-bold text-[#F2B705] shrink-0"
+            aria-hidden
+          >
+            {userInitials(profile.nome_completo)}
+          </div>
+          <span className="flex-1 truncate text-sm">{profile.nome_completo || 'Perfil'}</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={async () => {
+            await signOut(getFirebaseAuth())
+            router.push('/login')
+          }}
+          className="w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-[#A6A6A6] hover:bg-red-500/10 hover:text-red-500 transition-colors"
+        >
+          <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            />
+          </svg>
+          <span className="text-sm">Sair</span>
+        </button>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="min-h-screen min-h-[100dvh] bg-[#0D0D0D] text-white flex flex-col lg:flex-row">
+      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-14 border-b border-[#585759]/30 bg-[#0D0D0D]/95 backdrop-blur-md">
+        <span className="font-black text-[#F2B705] tracking-tighter text-lg">
+          FitManager<span className="text-white">.</span>
+        </span>
+        <button
+          type="button"
+          className="p-2 rounded-lg text-white bg-[#585759]/25 border border-[#585759]/40"
+          onClick={() => setMobileNavOpen(true)}
+          aria-expanded={mobileNavOpen}
+          aria-label="Abrir menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </header>
+
+      <div
+        className={`fixed inset-0 z-40 bg-black/60 lg:hidden transition-opacity ${
+          mobileNavOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!mobileNavOpen}
+        onClick={() => setMobileNavOpen(false)}
+      />
+
+      <aside
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-[min(18rem,88vw)] max-w-[18rem] border-r border-[#585759]/30 bg-[#0D0D0D] flex flex-col shadow-2xl transform transition-transform duration-200 ease-out lg:translate-x-0 lg:max-w-none ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {sidebar}
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-auto bg-[#0D0D0D]">
-        {children}
-      </main>
+      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[#0D0D0D] min-w-0">{children}</main>
     </div>
   )
 }

@@ -1,14 +1,16 @@
 'use client'
 
 import { Suspense, useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createUserWithEmailAndPassword, updateProfile, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { createAlunoPerfil, setPerfil } from '@/lib/firestore'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { createAlunoPerfil } from '@/lib/firestore'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { AuthShell } from '@/components/auth-shell'
 import { CheckCircle2 } from 'lucide-react'
 
 function RegisterAlunoForm() {
@@ -44,10 +46,6 @@ function RegisterAlunoForm() {
 
       await createAlunoPerfil(cred.user.uid, fullName, academiaId, phone || null)
 
-      if (phone) {
-        await setPerfil(cred.user.uid, { telefone: phone })
-      }
-
       await signOut(auth)
       setSuccess(true)
     } catch (err: unknown) {
@@ -60,88 +58,92 @@ function RegisterAlunoForm() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4">
-        <div className="text-center space-y-4 animate-in zoom-in-95 duration-300">
-          <div className="mx-auto w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center">
-            <CheckCircle2 className="w-9 h-9 text-emerald-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Cadastro Realizado!</h1>
-          <p className="text-[#A6A6A6] max-w-xs mx-auto">
-            Sua conta foi criada com sucesso. Faça login para acessar seus treinos.
-          </p>
-          <Button
-            onClick={() => router.push('/login')}
-            className="mt-4 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold"
-          >
-            Ir para o Login
-          </Button>
-        </div>
-      </div>
+      <AuthShell>
+        <Card className="w-full border-emerald-500/25 bg-[#0D0D0D]/85 backdrop-blur-xl text-center shadow-2xl">
+          <CardContent className="space-y-5 pt-10 pb-8">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
+              <CheckCircle2 className="h-9 w-9 text-emerald-400" />
+            </div>
+            <h1 className="text-2xl font-bold text-white">Cadastro realizado</h1>
+            <p className="mx-auto max-w-sm text-sm text-[#A6A6A6]">Faça login com o e-mail e a senha que você criou.</p>
+            <Button
+              onClick={() => router.push('/login')}
+              className="bg-[#F2B705] font-bold text-[#0D0D0D] hover:bg-[#BF9004]"
+            >
+              Ir para o login
+            </Button>
+          </CardContent>
+        </Card>
+      </AuthShell>
     )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4 relative overflow-hidden">
-      <div className="absolute top-0 right-1/4 w-[600px] h-[400px] bg-[#BF9004]/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-[500px] h-[300px] bg-[#F2B705]/10 blur-[100px] rounded-full pointer-events-none" />
-
-      <Card className="w-full max-w-md border-[#585759] bg-[#0D0D0D]/80 backdrop-blur-xl shadow-2xl z-10">
-        <CardHeader className="space-y-2 text-center pb-6">
-          <div className="mx-auto w-12 h-12 bg-[#F2B705] rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-[#F2B705]/20">
-            <svg className="w-6 h-6 text-[#0D0D0D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-white">Portal do Aluno</CardTitle>
+    <AuthShell>
+      <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
+        <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
+          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Portal do aluno</CardTitle>
           <CardDescription className="text-[#A6A6A6]">
-            Crie sua conta para acessar seus treinos e evolução.
+            Use o link que sua academia enviou. Sem o parâmetro do convite, o cadastro não está disponível.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {errorMsg && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">{errorMsg}</div>
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+              {errorMsg}
+            </div>
           )}
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#A6A6A6]">Nome Completo</Label>
+              <Label htmlFor="fullName" className="text-[#A6A6A6]">
+                Nome completo
+              </Label>
               <Input
                 id="fullName"
                 placeholder="Seu nome completo"
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-[#A6A6A6]">Telefone / WhatsApp</Label>
+              <Label htmlFor="phone" className="text-[#A6A6A6]">
+                Telefone / WhatsApp (opcional)
+              </Label>
               <Input
                 id="phone"
                 placeholder="(DDD) 99999-9999"
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#A6A6A6]">E-mail</Label>
+              <Label htmlFor="email" className="text-[#A6A6A6]">
+                E-mail
+              </Label>
               <Input
                 id="email"
                 type="email"
+                autoComplete="email"
                 placeholder="seu@email.com"
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-[#A6A6A6]">Senha</Label>
+              <Label htmlFor="password" className="text-[#A6A6A6]">
+                Senha (mín. 6 caracteres)
+              </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Mínimo 6 caracteres"
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                autoComplete="new-password"
+                placeholder="••••••••"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 minLength={6}
@@ -150,15 +152,20 @@ function RegisterAlunoForm() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold transition-all shadow-lg shadow-[#F2B705]/20 mt-2"
+              className="mt-2 h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
               disabled={loading || !academiaId}
             >
-              {loading ? 'Criando conta...' : 'Finalizar Cadastro'}
+              {loading ? 'Criando conta...' : 'Finalizar cadastro'}
             </Button>
           </form>
         </CardContent>
+        <CardFooter className="border-t border-[#585759]/50 pt-4">
+          <Link href="/login" className="w-full text-center text-sm text-[#A6A6A6] hover:text-[#F2B705]">
+            Já tenho conta — entrar
+          </Link>
+        </CardFooter>
       </Card>
-    </div>
+    </AuthShell>
   )
 }
 
