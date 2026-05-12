@@ -1,0 +1,9 @@
+# Copie este ficheiro para a raiz do repositório como .env.firebase.local
+# (o Git ignora .env.firebase.local — não faça commit das credenciais).
+#
+# 1) Na sua máquina: npx firebase-tools login:ci
+#    Copie o token que começa por ci_
+# 2) Firebase Console → Definições do projeto → ID do projeto
+
+FIREBASE_TOKEN=
+FIREBASE_PROJECT_ID=
