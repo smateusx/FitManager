@@ -39,3 +39,11 @@ firebase deploy --only firestore
 ```
 
 Nota: índices que já existem com os mesmos campos são ignorados ou mantidos; não duplicas dados.
+
+## GitHub Actions (deploy sem PC)
+
+1. No repositório: **Settings → Secrets and variables → Actions**
+2. Crie **FIREBASE_TOKEN** (`npx firebase-tools login:ci` na sua máquina) e **FIREBASE_PROJECT_ID**
+3. **Actions → Deploy Firestore rules → Run workflow**
+
+Também há workflow **Frontend CI** (typecheck) em alterações dentro de `frontend/`.

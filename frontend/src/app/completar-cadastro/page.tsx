@@ -32,22 +32,23 @@ function CompletarCadastroForm() {
   const [phone, setPhone] = useState('')
 
   useEffect(() => {
-    if (!fromQuery) {
-      try {
-        const s = sessionStorage.getItem('fitmanager_pending_academia_id')
-        if (s) setInviteAcademiaId(s)
-        const intent = sessionStorage.getItem('fitmanager_register_intent')
-        if (intent === 'aluno' || intent === 'admin') setRegisterIntent(intent)
-      } catch {
-        /* ignore */
-      }
-    } else {
+    if (fromQuery) {
+      setInviteAcademiaId(fromQuery)
       try {
         const intent = sessionStorage.getItem('fitmanager_register_intent')
         if (intent === 'aluno' || intent === 'admin') setRegisterIntent(intent)
       } catch {
         /* ignore */
       }
+      return
+    }
+    try {
+      const s = sessionStorage.getItem('fitmanager_pending_academia_id')
+      if (s) setInviteAcademiaId(s)
+      const intent = sessionStorage.getItem('fitmanager_register_intent')
+      if (intent === 'aluno' || intent === 'admin') setRegisterIntent(intent)
+    } catch {
+      /* ignore */
     }
   }, [fromQuery])
 
@@ -62,18 +63,38 @@ function CompletarCadastroForm() {
       router.replace('/verificar-email')
       return
     }
+    let cancelled = false
     void (async () => {
+      let inviteFromStorage: string | null = null
+      let intentFromStorage: 'admin' | 'aluno' | null = null
+      try {
+        inviteFromStorage = sessionStorage.getItem('fitmanager_pending_academia_id')
+        const intent = sessionStorage.getItem('fitmanager_register_intent')
+        if (intent === 'aluno' || intent === 'admin') intentFromStorage = intent
+      } catch {
+        /* ignore */
+      }
+
       const p = await getPerfil(u.uid)
+      if (cancelled) return
       if (p?.cpf) {
         const path = await resolvePostLoginPath(u)
         router.replace(path)
         return
       }
+
+      const inviteFromProfile = p?.role === 'ALUNO' && p.academia_id ? p.academia_id : null
+      const effectiveInvite = fromQuery ?? inviteFromStorage ?? inviteFromProfile
+      if (effectiveInvite) setInviteAcademiaId(effectiveInvite)
+      if (intentFromStorage) setRegisterIntent(intentFromStorage)
+
       setFullName(p?.nome_completo || u.displayName || '')
       setPhone(p?.telefone || '')
       try {
         const pendingGym = sessionStorage.getItem('fitmanager_pending_academy_name')
-        const isAluno = Boolean(inviteAcademiaId || registerIntent === 'aluno')
+        const isAluno = Boolean(
+          effectiveInvite || intentFromStorage === 'aluno' || p?.role === 'ALUNO'
+        )
         if (pendingGym && !isAluno) setGymName(pendingGym)
         const pendingPhone = sessionStorage.getItem('fitmanager_pending_phone')
         if (pendingPhone && !p?.telefone) setPhone(pendingPhone)
@@ -82,7 +103,10 @@ function CompletarCadastroForm() {
       }
       setLoading(false)
     })()
-  }, [router, inviteAcademiaId, registerIntent])
+    return () => {
+      cancelled = true
+    }
+  }, [router, fromQuery])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -102,14 +126,28 @@ function CompletarCadastroForm() {
       return
     }
 
-    const isAlunoFlow = Boolean(inviteAcademiaId || registerIntent === 'aluno')
-
     setSaving(true)
     try {
       await updateProfile(u, { displayName: fullName.trim() })
 
+      const perfilAtual = await getPerfil(u.uid)
+      let academiaAluno = inviteAcademiaId
+      try {
+        if (!academiaAluno) academiaAluno = sessionStorage.getItem('fitmanager_pending_academia_id')
+      } catch {
+        /* ignore */
+      }
+      if (!academiaAluno && perfilAtual?.role === 'ALUNO' && perfilAtual.academia_id) {
+        academiaAluno = perfilAtual.academia_id
+      }
+      const isAlunoFlow = Boolean(
+        registerIntent === 'aluno' ||
+          perfilAtual?.role === 'ALUNO' ||
+          (academiaAluno != null && academiaAluno !== '' && registerIntent !== 'admin')
+      )
+
       if (isAlunoFlow) {
-        if (!inviteAcademiaId) {
+        if (!academiaAluno) {
           setErrorMsg('Falta o convite da academia. Abra de novo o link de cadastro do aluno.')
           setSaving(false)
           return
@@ -119,7 +157,7 @@ function CompletarCadastroForm() {
           cpfDigits: digits,
           nome_completo: fullName.trim(),
           role: 'ALUNO',
-          academia_id: inviteAcademiaId,
+          academia_id: academiaAluno,
           telefone: phone.trim() || null,
         })
         try {

@@ -13,6 +13,7 @@ import {
   sendEmailVerification,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
+import { seedAlunoInviteProfile } from '@/lib/firestore'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
 import { CheckCircle2, Mail } from 'lucide-react'
@@ -32,10 +33,7 @@ function RegisterAlunoForm() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!academiaId) {
-      setErrorMsg('Link de convite inválido. Solicite um novo link à sua academia.')
-      return
-    }
+    if (!academiaId) return
     try {
       sessionStorage.setItem('fitmanager_pending_academia_id', academiaId)
       sessionStorage.setItem('fitmanager_register_intent', 'aluno')
@@ -64,6 +62,12 @@ function RegisterAlunoForm() {
       const auth = getFirebaseAuth()
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
       await updateProfile(cred.user, { displayName: fullName.trim() })
+      await seedAlunoInviteProfile({
+        userId: cred.user.uid,
+        academia_id: academiaId,
+        nome_completo: fullName.trim() || null,
+        telefone: phone.trim() || null,
+      })
       await sendEmailVerification(cred.user)
       try {
         sessionStorage.setItem('fitmanager_pending_phone', phone.trim())
@@ -123,6 +127,11 @@ function RegisterAlunoForm() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {!academiaId && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+              Link de convite inválido. Solicite um novo link à sua academia.
+            </div>
+          )}
           {errorMsg && (
             <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
               {errorMsg}
