@@ -1,0 +1,211 @@
+rules_version = '2';
+
+// FitManager — isolamento por academia (tenant).
+// Ajuste conforme o seu modelo no Firestore (nomes de campos devem bater com os documentos).
+//
+// Limitações conhecidas (melhorias futuras):
+// - Criação de perfil como ADMIN sem Cloud Function continua confiável apenas em conjunto com o fluxo da app;
+// - Atribuição de papel privilegiado idealmente via Firebase Admin SDK / Cloud Functions.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function perfilPath(uid) {
+      return /databases/$(database)/documents/perfis/$(uid);
+    }
+
+    function myPerfilExists() {
+      return signedIn() && exists(perfilPath(request.auth.uid));
+    }
+
+    function myPerfil() {
+      return get(perfilPath(request.auth.uid)).data;
+    }
+
+    function myAcademiaId() {
+      return myPerfilExists() && myPerfil().keys().hasAll(['academia_id']) && myPerfil().academia_id != null
+        ? myPerfil().academia_id
+        : null;
+    }
+
+    function myRole() {
+      return myPerfilExists() && myPerfil().keys().hasAll(['role']) ? myPerfil().role : '';
+    }
+
+    function isStaff() {
+      return myRole() == 'ADMIN' || myRole() == 'RECEPCIONISTA';
+    }
+
+    function sameAcademia(academiaId) {
+      return academiaId != null && academiaId == myAcademiaId();
+    }
+
+    function alunoAcademiaId(alunoUid) {
+      return exists(perfilPath(alunoUid))
+        ? get(perfilPath(alunoUid)).data.academia_id
+        : null;
+    }
+
+    function fichaData(fichaId) {
+      return get(/databases/$(database)/documents/fichas_treino/$(fichaId)).data;
+    }
+
+    // --- Perfis (documento ID = UID do Firebase Auth) ---
+    match /perfis/{userId} {
+      allow read: if signedIn() && (
+        request.auth.uid == userId ||
+        (isStaff() && resource.data.keys().hasAll(['academia_id']) && sameAcademia(resource.data.academia_id))
+      );
+
+      allow create: if signedIn() && request.auth.uid == userId;
+
+      allow update: if signedIn() && (
+        (
+          request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.academia_id == resource.data.academia_id
+        ) ||
+        (
+          isStaff() &&
+          resource.data.role == 'ALUNO' &&
+          resource.data.keys().hasAll(['academia_id']) &&
+          sameAcademia(resource.data.academia_id)
+        )
+      );
+
+      allow delete: if signedIn() &&
+        myRole() == 'ADMIN' &&
+        resource.data.role == 'ALUNO' &&
+        resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(resource.data.academia_id);
+    }
+
+    // --- Um CPF por conta (opcional no projeto Firebase) ---
+    match /cpf_claims/{cpf} {
+      allow read: if signedIn() && resource.data.keys().hasAll(['user_id']) && resource.data.user_id == request.auth.uid;
+
+      allow create, update: if signedIn() &&
+        request.resource.data.keys().hasAll(['user_id']) &&
+        request.resource.data.user_id == request.auth.uid;
+
+      allow delete: if false;
+    }
+
+    // --- Academias ---
+    match /academias/{academiaId} {
+      allow read: if signedIn() && sameAcademia(academiaId);
+
+      allow create: if signedIn();
+
+      allow update, delete: if signedIn() &&
+        myRole() == 'ADMIN' &&
+        sameAcademia(academiaId);
+    }
+
+    // --- Planos ---
+    match /planos/{planId} {
+      allow read: if signedIn() &&
+        resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(resource.data.academia_id);
+
+      allow create, update: if signedIn() &&
+        isStaff() &&
+        request.resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(request.resource.data.academia_id);
+
+      allow delete: if signedIn() &&
+        isStaff() &&
+        resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(resource.data.academia_id);
+    }
+
+    // --- Matrículas ---
+    match /matriculas/{matriculaId} {
+      allow read: if signedIn() && resource.data.keys().hasAll(['academia_id', 'aluno_id']) && (
+        resource.data.aluno_id == request.auth.uid ||
+        (isStaff() && sameAcademia(resource.data.academia_id))
+      );
+
+      allow create, update: if signedIn() &&
+        isStaff() &&
+        request.resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(request.resource.data.academia_id);
+
+      allow delete: if signedIn() &&
+        isStaff() &&
+        resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(resource.data.academia_id);
+    }
+
+    // --- Fichas de treino ---
+    match /fichas_treino/{fichaId} {
+      allow read: if signedIn() && resource.data.keys().hasAll(['academia_id', 'aluno_id']) && (
+        resource.data.aluno_id == request.auth.uid ||
+        (isStaff() && sameAcademia(resource.data.academia_id))
+      );
+
+      allow create, update: if signedIn() &&
+        isStaff() &&
+        request.resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(request.resource.data.academia_id);
+
+      allow delete: if signedIn() &&
+        isStaff() &&
+        resource.data.keys().hasAll(['academia_id']) &&
+        sameAcademia(resource.data.academia_id);
+    }
+
+    // --- Exercícios (referenciam ficha_id) ---
+    match /exercicios/{exercicioId} {
+      allow read: if signedIn() &&
+        resource.data.keys().hasAll(['ficha_id']) &&
+        exists(/databases/$(database)/documents/fichas_treino/$(resource.data.ficha_id)) &&
+        fichaData(resource.data.ficha_id).keys().hasAll(['academia_id', 'aluno_id']) &&
+        (
+          fichaData(resource.data.ficha_id).aluno_id == request.auth.uid ||
+          (isStaff() && sameAcademia(fichaData(resource.data.ficha_id).academia_id))
+        );
+
+      allow create, update: if signedIn() &&
+        isStaff() &&
+        request.resource.data.keys().hasAll(['ficha_id']) &&
+        exists(/databases/$(database)/documents/fichas_treino/$(request.resource.data.ficha_id)) &&
+        fichaData(request.resource.data.ficha_id).keys().hasAll(['academia_id']) &&
+        sameAcademia(fichaData(request.resource.data.ficha_id).academia_id);
+
+      allow delete: if signedIn() &&
+        isStaff() &&
+        resource.data.keys().hasAll(['ficha_id']) &&
+        exists(/databases/$(database)/documents/fichas_treino/$(resource.data.ficha_id)) &&
+        fichaData(resource.data.ficha_id).keys().hasAll(['academia_id']) &&
+        sameAcademia(fichaData(resource.data.ficha_id).academia_id);
+    }
+
+    // --- Registros de carga (aluno grava o próprio; staff da mesma academia lê) ---
+    match /registros_carga/{registroId} {
+      allow read: if signedIn() && resource.data.keys().hasAll(['aluno_id']) && (
+        resource.data.aluno_id == request.auth.uid ||
+        (
+          isStaff() &&
+          alunoAcademiaId(resource.data.aluno_id) != null &&
+          sameAcademia(alunoAcademiaId(resource.data.aluno_id))
+        )
+      );
+
+      allow create: if signedIn() &&
+        request.resource.data.keys().hasAll(['aluno_id']) &&
+        request.resource.data.aluno_id == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    // Negar explicitamente o resto (não usar wildcards permissivos em produção).
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
