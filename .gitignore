@@ -4,3 +4,6 @@ dist/
 .env
 .env.local
 *.log
+
+# Credenciais Firebase local (nunca commit)
+.env.firebase.local
