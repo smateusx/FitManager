@@ -1,0 +1,17 @@
+# Copie para a raiz do repositório como .env.firebase.local
+# PowerShell: Copy-Item scripts\firebase-env.example .env.firebase.local
+#
+# NUNCA faça commit deste ficheiro nem partilhe o token.
+#
+# Token CI (Firebase CLI): na pasta do projeto execute:
+#   npx firebase-tools login:ci
+# Abra o URL no browser, autorize, cole o token abaixo.
+# Se o token vazar (chat, screenshot), gere outro imediatamente.
+#
+# Para CI recomendado pela Google: conta de serviço + GOOGLE_APPLICATION_CREDENTIALS
+# https://cloud.google.com/docs/authentication/getting-started
+#
+# ID do projeto: Firebase Console → Definições do projeto
+
+FIREBASE_TOKEN=
+FIREBASE_PROJECT_ID=
