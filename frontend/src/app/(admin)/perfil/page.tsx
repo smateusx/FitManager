@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { updatePassword } from 'firebase/auth'
+import { updatePassword, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
+import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/components/password-session-after-change'
 import { userInitials } from '@/lib/user-initials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,7 @@ export default function PerfilPage() {
   const [telefone, setTelefone] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSessionMode, setPasswordSessionMode] = useState<PasswordSessionMode>('stay')
 
   const router = useRouter()
 
@@ -91,6 +93,10 @@ export default function PerfilPage() {
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
+    if (newPassword.length < 6) {
+      alert('A nova senha deve ter pelo menos 6 caracteres.')
+      return
+    }
     if (newPassword !== confirmPassword) {
       alert('As senhas não coincidem!')
       return
@@ -98,13 +104,24 @@ export default function PerfilPage() {
 
     setSaving(true)
     try {
-      const u = getFirebaseAuth().currentUser
+      const auth = getFirebaseAuth()
+      const u = auth.currentUser
       if (!u) return
       await updatePassword(u, newPassword)
 
-      setSuccess('Senha alterada com sucesso!')
+      if (passwordSessionMode === 'sign_out_here') {
+        setNewPassword('')
+        setConfirmPassword('')
+        await signOut(auth)
+        router.replace('/login')
+        return
+      }
+
       setNewPassword('')
       setConfirmPassword('')
+      setPasswordSessionMode('stay')
+      await u.reload()
+      setSuccess('Senha alterada com sucesso.')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro'
@@ -249,6 +266,8 @@ export default function PerfilPage() {
                     />
                   </div>
                 </div>
+
+                <PasswordSessionAfterChange value={passwordSessionMode} onChange={setPasswordSessionMode} />
 
                 <Button
                   type="submit"

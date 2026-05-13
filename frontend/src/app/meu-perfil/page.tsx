@@ -6,6 +6,7 @@ import { signOut, updatePassword } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
 import { userInitials } from '@/lib/user-initials'
+import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/components/password-session-after-change'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,6 +26,7 @@ export default function AlunoPerfilPage() {
   const [telefone, setTelefone] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSessionMode, setPasswordSessionMode] = useState<PasswordSessionMode>('stay')
 
   const router = useRouter()
 
@@ -89,6 +91,10 @@ export default function AlunoPerfilPage() {
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
+    if (newPassword.length < 6) {
+      alert('A nova senha deve ter pelo menos 6 caracteres.')
+      return
+    }
     if (newPassword !== confirmPassword) {
       alert('As senhas não coincidem!')
       return
@@ -96,13 +102,24 @@ export default function AlunoPerfilPage() {
 
     setSaving(true)
     try {
-      const u = getFirebaseAuth().currentUser
+      const auth = getFirebaseAuth()
+      const u = auth.currentUser
       if (!u) return
       await updatePassword(u, newPassword)
 
-      setSuccess('Senha alterada com sucesso!')
+      if (passwordSessionMode === 'sign_out_here') {
+        setNewPassword('')
+        setConfirmPassword('')
+        await signOut(auth)
+        router.push('/login')
+        return
+      }
+
       setNewPassword('')
       setConfirmPassword('')
+      setPasswordSessionMode('stay')
+      await u.reload()
+      setSuccess('Senha alterada com sucesso.')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro'
@@ -200,7 +217,7 @@ export default function AlunoPerfilPage() {
                 <h2 className="text-xl font-bold">Segurança</h2>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nova senha</Label>
                   <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="bg-[#0D0D0D] border-[#585759]" />
@@ -210,6 +227,8 @@ export default function AlunoPerfilPage() {
                   <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="bg-[#0D0D0D] border-[#585759]" />
                 </div>
               </div>
+
+              <PasswordSessionAfterChange value={passwordSessionMode} onChange={setPasswordSessionMode} />
 
               <Button type="submit" disabled={saving} variant="outline" className="border-[#F2B705] text-[#F2B705]">
                 Alterar senha
