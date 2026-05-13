@@ -133,11 +133,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               : 'text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white'
           }`}
         >
-          <ProfileAvatar
-            fotoUrl={profile.foto_url}
-            name={profile.nome_completo || 'Perfil'}
-            sizeClass="h-8 w-8 text-[10px] border border-[#F2B705]/35"
-          />
+          <ProfileAvatar name={profile.nome_completo || 'Perfil'} sizeClass="h-8 w-8 text-[10px]" />
           <span className="flex-1 truncate text-sm">{profile.nome_completo || 'Perfil'}</span>
         </Link>
 
@@ -145,7 +141,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           type="button"
           onClick={async () => {
             await signOut(getFirebaseAuth())
-            router.push('/login')
+            router.push(
+              profile.role === 'RECEPCIONISTA' ? '/login/recepcionista' : '/login/academia'
+            )
           }}
           className="w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-[#A6A6A6] hover:bg-red-500/10 hover:text-red-500 transition-colors"
         >

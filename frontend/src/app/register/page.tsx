@@ -53,6 +53,8 @@ export default function RegisterPage() {
       await sendEmailVerification(cred.user)
 
       try {
+        sessionStorage.removeItem('fitmanager_pending_academia_id')
+        sessionStorage.removeItem('fitmanager_register_intent')
         sessionStorage.setItem('fitmanager_pending_academy_name', gymName.trim())
         sessionStorage.setItem('fitmanager_register_intent', 'admin')
       } catch {
@@ -97,7 +99,7 @@ export default function RegisterPage() {
             <Button
               type="button"
               className="h-11 w-full bg-[#F2B705] font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/login/academia')}
             >
               Ir para o login
             </Button>
@@ -212,7 +214,7 @@ export default function RegisterPage() {
         <CardFooter className="flex flex-col gap-3 border-t border-[#585759]/30 pt-4">
           <p className="text-center text-sm text-[#A6A6A6]">
             Já tem conta?{' '}
-            <Link href="/login" className="font-medium text-[#F2B705] hover:text-[#BF9004]">
+            <Link href="/login/academia" className="font-medium text-[#F2B705] hover:text-[#BF9004]">
               Entrar
             </Link>
           </p>

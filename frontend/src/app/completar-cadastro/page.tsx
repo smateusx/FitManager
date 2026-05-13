@@ -12,7 +12,7 @@ import {
   type Role,
 } from '@/lib/firestore'
 import { isValidCpf, normalizeCpfDigits } from '@/lib/cpf'
-import { resolvePostLoginPath } from '@/lib/post-login'
+import { resolvePostLogin } from '@/lib/post-login'
 import { AuthShell } from '@/components/auth-shell'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -89,8 +89,12 @@ function CompletarCadastroForm() {
       const p = await getPerfil(u.uid)
       if (cancelled) return
       if (p?.cpf) {
-        const path = await resolvePostLoginPath(u)
-        router.replace(path)
+        const r = await resolvePostLogin(u)
+        if (!r.ok) {
+          router.replace(`/login?erro=${encodeURIComponent(r.message)}`)
+          return
+        }
+        router.replace(r.path)
         return
       }
 
@@ -168,11 +172,7 @@ function CompletarCadastroForm() {
 
       const isAlunoFlow =
         !isRecepcionistaFlow &&
-        (registerIntent === 'aluno' ||
-          perfilAtual?.role === 'ALUNO' ||
-          (Boolean(academiaInvite) &&
-            registerIntent !== 'admin' &&
-            registerIntent !== 'recepcionista'))
+        (registerIntent === 'aluno' || perfilAtual?.role === 'ALUNO')
 
       function clearInviteSession() {
         try {
@@ -238,8 +238,12 @@ function CompletarCadastroForm() {
         }
       }
 
-      const path = await resolvePostLoginPath(u)
-      router.replace(path)
+      const r = await resolvePostLogin(u)
+      if (!r.ok) {
+        router.replace(`/login?erro=${encodeURIComponent(r.message)}`)
+        return
+      }
+      router.replace(r.path)
     } catch (err) {
       if (err instanceof CpfAlreadyRegisteredError) {
         setErrorMsg(err.message)
@@ -262,10 +266,7 @@ function CompletarCadastroForm() {
   const receptionLike =
     registerIntent === 'recepcionista' || seededInviteRole === 'RECEPCIONISTA'
   const studentLike =
-    !receptionLike &&
-    (registerIntent === 'aluno' ||
-      seededInviteRole === 'ALUNO' ||
-      (Boolean(inviteAcademiaId) && registerIntent !== 'admin'))
+    !receptionLike && (registerIntent === 'aluno' || seededInviteRole === 'ALUNO')
 
   const skipGymField = receptionLike || studentLike
 
