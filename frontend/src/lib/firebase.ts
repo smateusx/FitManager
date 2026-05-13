@@ -12,13 +12,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-function resolveStorageGsUrl(): string | undefined {
-  const raw = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim()
-  if (!raw) return undefined
-  if (raw.startsWith('gs://')) return raw
-  return `gs://${raw}`
-}
-
 function hasConfig() {
   return Boolean(
     firebaseConfig.apiKey &&
@@ -51,9 +44,7 @@ export function getDb(): Firestore {
 }
 
 export function getFirebaseStorage(): FirebaseStorage {
-  const app = getFirebaseApp()
-  const gs = resolveStorageGsUrl()
-  return gs ? getStorage(app, gs) : getStorage(app)
+  return getStorage(getFirebaseApp())
 }
 
 export { hasConfig }
