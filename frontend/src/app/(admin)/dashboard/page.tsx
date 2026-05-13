@@ -7,11 +7,8 @@ import {
   countPerfisRole,
   matriculasCriadasDesde,
   matriculasRecentes,
-  matriculasTodas,
 } from '@/lib/firestore'
-import { FileDown, FileSpreadsheet } from 'lucide-react'
 import { RevenueChart } from '@/components/revenue-chart'
-import { ReportsService } from '@/lib/reports-service'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 
@@ -47,7 +44,6 @@ export default function DashboardPage() {
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [isExporting, setIsExporting] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -106,62 +102,6 @@ export default function DashboardPage() {
     void loadDashboard()
   }, [authLoading, academiaId])
 
-  const handleExportPDF = async () => {
-    if (isReceptionist) return
-    setIsExporting(true)
-    try {
-      if (!academiaId) return
-      const allMatriculas = await matriculasTodas(academiaId)
-
-      const columns = ['Aluno', 'Plano', 'Valor', 'Data', 'Status']
-      const rows = (allMatriculas ?? []).map((m: Record<string, unknown>) => {
-        const perfis = m.perfis as { nome_completo?: string } | undefined
-        const planos = m.planos as { nome?: string } | undefined
-        return [
-          perfis?.nome_completo || '—',
-          planos?.nome || '—',
-          `R$ ${Number(m.valor_pago ?? 0).toFixed(2)}`,
-          new Date(String(m.criado_em ?? '')).toLocaleDateString('pt-BR'),
-          String(m.status ?? ''),
-        ]
-      })
-
-      ReportsService.exportToPDF(
-        columns,
-        rows,
-        'Relatório de matrículas',
-        `fitmanager-${new Date().toISOString().split('T')[0]}`
-      )
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
-  const handleExportExcel = async () => {
-    if (isReceptionist) return
-    setIsExporting(true)
-    try {
-      if (!academiaId) return
-      const allMatriculas = await matriculasTodas(academiaId)
-
-      const formattedData = (allMatriculas ?? []).map((m: Record<string, unknown>) => {
-        const perfis = m.perfis as { nome_completo?: string } | undefined
-        const planos = m.planos as { nome?: string } | undefined
-        return {
-          Aluno: perfis?.nome_completo,
-          Plano: planos?.nome,
-          'Valor (R$)': Number(m.valor_pago ?? 0),
-          Data: new Date(String(m.criado_em ?? '')).toLocaleDateString('pt-BR'),
-          Status: m.status,
-        }
-      })
-
-      ReportsService.exportToExcel(formattedData, `fitmanager-${new Date().toISOString().split('T')[0]}`)
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
   const statItems = [
     { label: 'Alunos', value: String(stats.totalAlunos) },
     {
@@ -184,32 +124,6 @@ export default function DashboardPage() {
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!isReceptionist && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isExporting}
-                  onClick={handleExportPDF}
-                  className="h-9 border-[#585759]/40 bg-transparent text-[#A6A6A6] hover:bg-[#585759]/15 hover:text-white"
-                >
-                  <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                  PDF
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isExporting}
-                  onClick={handleExportExcel}
-                  className="h-9 border-[#585759]/40 bg-transparent text-[#A6A6A6] hover:bg-[#585759]/15 hover:text-white"
-                >
-                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                  Excel
-                </Button>
-              </>
-            )}
             <Button
               type="button"
               size="sm"

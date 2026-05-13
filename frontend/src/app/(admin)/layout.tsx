@@ -59,7 +59,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className="p-5 sm:p-6 border-b border-[#585759]/20 shrink-0">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <Link href="/" className="inline-block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]">
+            <Link
+              href="/dashboard"
+              className="inline-block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]"
+            >
               <h1 className="text-xl sm:text-2xl font-black text-[#F2B705] tracking-tighter">
                 FitManager<span className="text-white">.</span>
               </h1>
@@ -164,7 +167,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen min-h-[100dvh] bg-[#0D0D0D] text-white flex flex-col lg:flex-row">
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-14 border-b border-[#585759]/30 bg-[#0D0D0D]/95 backdrop-blur-md">
         <Link
-          href="/"
+          href="/dashboard"
           className="font-black text-[#F2B705] tracking-tighter text-lg rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]"
         >
           FitManager<span className="text-white">.</span>

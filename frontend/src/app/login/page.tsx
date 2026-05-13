@@ -13,9 +13,10 @@ import {
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
 import { Dumbbell } from 'lucide-react'
+import { GoogleIcon } from '@/components/google-icon'
 import { resolvePostLoginPath } from '@/lib/post-login'
 
 function firebaseAuthMessage(err: unknown): string {
@@ -104,30 +105,27 @@ export default function LoginPage() {
 
   return (
     <AuthShell>
-      <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
-        <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#F2B705] shadow-lg shadow-[#F2B705]/20 sm:mx-0">
-            <Dumbbell className="h-6 w-6 text-[#0D0D0D]" aria-hidden />
+      <Card className="w-full border border-[#585759]/35 bg-[#0D0D0D]/90 shadow-xl backdrop-blur-xl">
+        <CardHeader className="space-y-3 pb-4 text-center">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[#F2B705]">
+            <Dumbbell className="h-5 w-5 text-[#0D0D0D]" aria-hidden />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Bem-vindo de volta</CardTitle>
-          <CardDescription className="text-[#A6A6A6]">
-            Entre com e-mail ou Google. Novos utilizadores com Google confirmam o e-mail automaticamente; depois pedimos CPF
-            e dados da conta.
-          </CardDescription>
+          <CardTitle className="text-xl font-semibold tracking-tight text-white">Entrar</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pb-2">
           <Button
             type="button"
             variant="outline"
-            className="h-11 w-full border-[#585759] bg-white text-[#0D0D0D] hover:bg-[#f3f3f3]"
+            className="h-11 w-full gap-2 border-[#585759]/50 bg-[#0D0D0D] text-white hover:bg-[#585759]/15 hover:text-white"
             onClick={handleGoogle}
             disabled={loading || googleLoading}
           >
-            {googleLoading ? 'Abrindo Google…' : 'Continuar com Google'}
+            <GoogleIcon className="h-[18px] w-[18px] shrink-0" />
+            <span>{googleLoading ? 'Abrindo Google…' : 'Continuar com Google'}</span>
           </Button>
-          <div className="relative py-1 text-center text-xs text-[#585759]">
-            <span className="relative z-10 bg-[#0D0D0D]/90 px-2">ou e-mail e senha</span>
-            <div className="absolute left-0 right-0 top-1/2 border-t border-[#585759]/40" />
+          <div className="relative py-0.5 text-center text-[11px] uppercase tracking-wider text-[#585759]">
+            <span className="relative z-10 bg-[#0D0D0D] px-2">ou e-mail</span>
+            <div className="absolute left-0 right-0 top-1/2 border-t border-[#585759]/35" />
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             {errorMsg && (
@@ -140,8 +138,8 @@ export default function LoginPage() {
                 {resetMsg}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#A6A6A6]">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs text-[#A6A6A6]">
                 E-mail
               </Label>
               <Input
@@ -155,9 +153,9 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Label htmlFor="password" className="text-[#A6A6A6]">
+                <Label htmlFor="password" className="text-xs text-[#A6A6A6]">
                   Senha
                 </Label>
                 <button
@@ -188,18 +186,15 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-3 border-t border-[#585759]/50 pt-4">
+        <CardFooter className="flex flex-col gap-3 border-t border-[#585759]/30 pt-4">
           <p className="text-center text-sm text-[#A6A6A6]">
-            Novo por aqui?{' '}
-            <Link href="/register" className="font-semibold text-[#F2B705] transition-colors hover:text-[#BF9004]">
-              Cadastre sua academia
+            Sem conta?{' '}
+            <Link href="/register" className="font-medium text-[#F2B705] hover:text-[#BF9004]">
+              Cadastrar academia
             </Link>
           </p>
-          <Link
-            href="/"
-            className="block text-center text-xs text-[#585759] transition-colors hover:text-[#A6A6A6]"
-          >
-            ← Voltar ao início
+          <Link href="/" className="block text-center text-xs text-[#585759] hover:text-[#A6A6A6]">
+            Início
           </Link>
         </CardFooter>
       </Card>

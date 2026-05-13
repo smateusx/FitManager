@@ -13,7 +13,7 @@ import {
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
 import { Building2, Mail } from 'lucide-react'
 
@@ -82,26 +82,26 @@ export default function RegisterPage() {
   if (sent) {
     return (
       <AuthShell variant="wide">
-        <Card className="w-full border-emerald-500/25 bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
-          <CardHeader className="space-y-2 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
-              <Mail className="h-7 w-7" />
+        <Card className="w-full border border-emerald-500/30 bg-[#0D0D0D]/90 shadow-xl backdrop-blur-xl">
+          <CardHeader className="space-y-3 pb-3 text-center">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+              <Mail className="h-5 w-5" />
             </div>
-            <CardTitle className="text-2xl font-bold text-white">Verifique seu e-mail</CardTitle>
-            <CardDescription className="text-[#A6A6A6]">
-              Abra a mensagem que enviamos para <span className="font-medium text-white">{email.trim()}</span>, clique
-              no link e depois faça login para continuar o cadastro da academia (nome da unidade e CPF).
-            </CardDescription>
+            <CardTitle className="text-xl font-semibold text-white">Confirme o e-mail</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
+            <p className="text-center text-sm text-[#A6A6A6]">
+              Enviamos um link para <span className="font-medium text-white">{email.trim()}</span>. Depois de confirmar,
+              faça login para completar o cadastro.
+            </p>
             <Button
               type="button"
-              className="h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] hover:bg-[#BF9004]"
+              className="h-11 w-full bg-[#F2B705] font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
               onClick={() => router.push('/login')}
             >
               Ir para o login
             </Button>
-            <p className="text-center text-xs text-[#585759]">Não viu o e-mail? Confira spam e lixo eletrônico.</p>
+            <p className="text-center text-[11px] text-[#585759]">Confira também spam e promoções.</p>
           </CardContent>
         </Card>
       </AuthShell>
@@ -110,26 +110,24 @@ export default function RegisterPage() {
 
   return (
     <AuthShell variant="wide">
-      <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
-        <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#F2B705] shadow-lg shadow-[#F2B705]/20 sm:mx-0">
-            <Building2 className="h-6 w-6 text-[#0D0D0D]" aria-hidden />
+      <Card className="w-full border border-[#585759]/35 bg-[#0D0D0D]/90 shadow-xl backdrop-blur-xl">
+        <CardHeader className="space-y-3 pb-4 text-center">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[#F2B705]">
+            <Building2 className="h-5 w-5 text-[#0D0D0D]" aria-hidden />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Cadastre sua academia</CardTitle>
-          <CardDescription className="text-[#A6A6A6]">
-            Criamos sua conta com Firebase Auth. Você confirma o e-mail, faz login e completa CPF e dados da unidade.
-          </CardDescription>
+          <CardTitle className="text-xl font-semibold tracking-tight text-white">Nova academia</CardTitle>
+          <p className="text-sm text-[#585759]">Confirme o e-mail após criar a conta; depois complete CPF e dados da unidade.</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleRegister} className="space-y-5">
+          <form onSubmit={handleRegister} className="space-y-4">
             {errorMsg && (
               <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
                 {errorMsg}
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="gymName" className="text-[#A6A6A6]">
-                Nome da academia (para depois do login)
+            <div className="space-y-1.5">
+              <Label htmlFor="gymName" className="text-xs text-[#A6A6A6]">
+                Nome da academia
               </Label>
               <Input
                 id="gymName"
@@ -140,8 +138,8 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#A6A6A6]">
+            <div className="space-y-1.5">
+              <Label htmlFor="fullName" className="text-xs text-[#A6A6A6]">
                 Seu nome completo
               </Label>
               <Input
@@ -154,8 +152,8 @@ export default function RegisterPage() {
               />
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="email" className="text-[#A6A6A6]">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="email" className="text-xs text-[#A6A6A6]">
                   E-mail
                 </Label>
                 <Input
@@ -169,9 +167,9 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-[#A6A6A6]">
-                  Senha (mín. 6 caracteres)
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs text-[#A6A6A6]">
+                  Senha (mín. 6)
                 </Label>
                 <Input
                   id="password"
@@ -185,8 +183,8 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="passwordConfirm" className="text-[#A6A6A6]">
+              <div className="space-y-1.5">
+                <Label htmlFor="passwordConfirm" className="text-xs text-[#A6A6A6]">
                   Confirmar senha
                 </Label>
                 <Input
@@ -204,22 +202,22 @@ export default function RegisterPage() {
             </div>
             <Button
               type="submit"
-              className="mt-2 h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
+              className="mt-1 h-11 w-full bg-[#F2B705] font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
               disabled={loading}
             >
-              {loading ? 'Criando conta...' : 'Criar conta e enviar e-mail'}
+              {loading ? 'Criando…' : 'Criar conta'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-3 border-t border-[#585759]/50 pt-4">
+        <CardFooter className="flex flex-col gap-3 border-t border-[#585759]/30 pt-4">
           <p className="text-center text-sm text-[#A6A6A6]">
             Já tem conta?{' '}
-            <Link href="/login" className="font-semibold text-[#F2B705] transition-colors hover:text-[#BF9004]">
+            <Link href="/login" className="font-medium text-[#F2B705] hover:text-[#BF9004]">
               Entrar
             </Link>
           </p>
-          <Link href="/" className="block text-center text-xs text-[#585759] transition-colors hover:text-[#A6A6A6]">
-            ← Voltar ao início
+          <Link href="/" className="block text-center text-xs text-[#585759] hover:text-[#A6A6A6]">
+            Início
           </Link>
         </CardFooter>
       </Card>
