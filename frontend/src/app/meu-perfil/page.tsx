@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signOut, updatePassword } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
-import { userInitials } from '@/lib/user-initials'
+import { ProfilePhotoSection } from '@/components/profile-photo-section'
 import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/components/password-session-after-change'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ export default function AlunoPerfilPage() {
 
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordSessionMode, setPasswordSessionMode] = useState<PasswordSessionMode>('stay')
@@ -56,6 +57,7 @@ export default function AlunoPerfilPage() {
         setPerfil(data)
         setNome(data.nome_completo || '')
         setTelefone(data.telefone || '')
+        setFotoUrl(data.foto_url ?? null)
       } catch (err) {
         console.error('Erro ao carregar perfil:', err)
       } finally {
@@ -131,16 +133,16 @@ export default function AlunoPerfilPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0D0D0D]">
+      <div className="flex min-h-[50vh] items-center justify-center bg-[#0D0D0D] py-16">
         <Loader2 className="w-8 h-8 text-[#F2B705] animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white">
-      <nav className="sticky top-0 z-30 bg-[#0D0D0D]/80 backdrop-blur-md border-b border-[#585759]/30">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+    <div className="min-h-0 bg-[#0D0D0D] pb-10 text-white">
+      <nav className="sticky top-0 z-30 border-b border-[#585759]/30 bg-[#0D0D0D]/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4 sm:h-16 sm:px-6">
           <button
             onClick={() => router.push('/meu-treino')}
             className="flex items-center gap-2 text-[#A6A6A6] hover:text-white transition-colors group"
@@ -161,7 +163,7 @@ export default function AlunoPerfilPage() {
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto p-6 lg:p-12">
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
         <header className="mb-10">
           <h1 className="text-3xl font-black text-white tracking-tight">Meu Perfil</h1>
           <p className="text-[#A6A6A6] mt-1">Configure sua conta e mantenha seus dados atualizados.</p>
@@ -176,14 +178,15 @@ export default function AlunoPerfilPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-10">
           <aside className="lg:col-span-1">
-            <div className="rounded-2xl border border-[#585759]/30 bg-[#0D0D0D]/60 p-8 flex flex-col items-center text-center">
-              <div
-                className="w-24 h-24 rounded-full bg-[#F2B705]/15 border-2 border-[#F2B705]/40 flex items-center justify-center text-2xl font-black text-[#F2B705] tracking-tight"
-                aria-hidden
-              >
-                {userInitials(nome || perfil?.nome_completo)}
-              </div>
-              <p className="mt-4 text-sm text-[#A6A6A6]">Sua conta usa iniciais no lugar de foto.</p>
+            <div className="flex flex-col items-center rounded-2xl border border-[#585759]/30 bg-[#0D0D0D]/60 p-6 text-center sm:p-8">
+              {userId ? (
+                <ProfilePhotoSection
+                  userId={userId}
+                  displayName={nome || perfil?.nome_completo || '?'}
+                  fotoUrl={fotoUrl}
+                  onChange={setFotoUrl}
+                />
+              ) : null}
             </div>
           </aside>
 

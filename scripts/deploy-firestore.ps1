@@ -20,7 +20,7 @@ if (-not $env:FIREBASE_TOKEN) { Write-Error 'FIREBASE_TOKEN em falta — veja sc
 if (-not $env:FIREBASE_PROJECT_ID) { Write-Error 'FIREBASE_PROJECT_ID em falta' }
 
 npx --yes firebase-tools@latest deploy `
-    --only firestore `
+    --only firestore,storage `
     --project $env:FIREBASE_PROJECT_ID `
     --token $env:FIREBASE_TOKEN `
     --non-interactive

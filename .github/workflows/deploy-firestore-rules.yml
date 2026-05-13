@@ -1,11 +1,11 @@
-# Manual: publica Firestore (rules + indexes) com token CI.
+# Manual: publica Firestore (rules + indexes) e Storage (rules) com token CI.
 # Secrets no repo → Settings → Secrets and variables → Actions:
 #   FIREBASE_TOKEN         (npx firebase-tools login:ci na tua máquina)
 #   FIREBASE_PROJECT_ID    (ex.: fitmanager-prod)
 #
-# Actions → "Deploy Firestore rules" → Run workflow
+# Actions → "Deploy Firestore & Storage rules" → Run workflow
 
-name: Deploy Firestore rules
+name: Deploy Firestore & Storage rules
 
 on:
   workflow_dispatch:
@@ -26,7 +26,7 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Deploy Firestore
+      - name: Deploy Firestore and Storage
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -35,4 +35,4 @@ jobs:
             echo "::error::Configure FIREBASE_TOKEN e FIREBASE_PROJECT_ID nos secrets do repositório."
             exit 1
           fi
-          firebase deploy --only firestore --project "${FIREBASE_PROJECT_ID}" --token "${FIREBASE_TOKEN}" --non-interactive
+          firebase deploy --only firestore,storage --project "${FIREBASE_PROJECT_ID}" --token "${FIREBASE_TOKEN}" --non-interactive

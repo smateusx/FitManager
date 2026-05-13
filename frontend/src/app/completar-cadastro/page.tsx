@@ -4,7 +4,13 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { createAcademia, getPerfil, registerPerfilAndClaimCpf, CpfAlreadyRegisteredError } from '@/lib/firestore'
+import {
+  createAcademia,
+  getPerfil,
+  registerPerfilAndClaimCpf,
+  CpfAlreadyRegisteredError,
+  type Role,
+} from '@/lib/firestore'
 import { isValidCpf, normalizeCpfDigits } from '@/lib/cpf'
 import { resolvePostLoginPath } from '@/lib/post-login'
 import { AuthShell } from '@/components/auth-shell'
@@ -15,12 +21,20 @@ import { Label } from '@/components/ui/label'
 import { Loader2, UserCircle } from 'lucide-react'
 import { updateProfile } from 'firebase/auth'
 
+type RegisterIntent = 'admin' | 'aluno' | 'recepcionista' | null
+
+function parseRegisterIntent(raw: string | null): RegisterIntent {
+  if (raw === 'admin' || raw === 'aluno' || raw === 'recepcionista') return raw
+  return null
+}
+
 function CompletarCadastroForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fromQuery = searchParams.get('academia_id')
   const [inviteAcademiaId, setInviteAcademiaId] = useState<string | null>(fromQuery)
-  const [registerIntent, setRegisterIntent] = useState<'admin' | 'aluno' | null>(null)
+  const [registerIntent, setRegisterIntent] = useState<RegisterIntent>(null)
+  const [seededInviteRole, setSeededInviteRole] = useState<Role | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -35,8 +49,7 @@ function CompletarCadastroForm() {
     if (fromQuery) {
       setInviteAcademiaId(fromQuery)
       try {
-        const intent = sessionStorage.getItem('fitmanager_register_intent')
-        if (intent === 'aluno' || intent === 'admin') setRegisterIntent(intent)
+        setRegisterIntent(parseRegisterIntent(sessionStorage.getItem('fitmanager_register_intent')))
       } catch {
         /* ignore */
       }
@@ -45,8 +58,7 @@ function CompletarCadastroForm() {
     try {
       const s = sessionStorage.getItem('fitmanager_pending_academia_id')
       if (s) setInviteAcademiaId(s)
-      const intent = sessionStorage.getItem('fitmanager_register_intent')
-      if (intent === 'aluno' || intent === 'admin') setRegisterIntent(intent)
+      setRegisterIntent(parseRegisterIntent(sessionStorage.getItem('fitmanager_register_intent')))
     } catch {
       /* ignore */
     }
@@ -66,11 +78,10 @@ function CompletarCadastroForm() {
     let cancelled = false
     void (async () => {
       let inviteFromStorage: string | null = null
-      let intentFromStorage: 'admin' | 'aluno' | null = null
+      let intentFromStorage: RegisterIntent = null
       try {
         inviteFromStorage = sessionStorage.getItem('fitmanager_pending_academia_id')
-        const intent = sessionStorage.getItem('fitmanager_register_intent')
-        if (intent === 'aluno' || intent === 'admin') intentFromStorage = intent
+        intentFromStorage = parseRegisterIntent(sessionStorage.getItem('fitmanager_register_intent'))
       } catch {
         /* ignore */
       }
@@ -83,19 +94,26 @@ function CompletarCadastroForm() {
         return
       }
 
-      const inviteFromProfile = p?.role === 'ALUNO' && p.academia_id ? p.academia_id : null
+      const inviteFromProfile =
+        (p?.role === 'ALUNO' || p?.role === 'RECEPCIONISTA') && p.academia_id ? p.academia_id : null
       const effectiveInvite = fromQuery ?? inviteFromStorage ?? inviteFromProfile
       if (effectiveInvite) setInviteAcademiaId(effectiveInvite)
       if (intentFromStorage) setRegisterIntent(intentFromStorage)
+
+      if (p?.role === 'ALUNO' || p?.role === 'RECEPCIONISTA') setSeededInviteRole(p.role)
 
       setFullName(p?.nome_completo || u.displayName || '')
       setPhone(p?.telefone || '')
       try {
         const pendingGym = sessionStorage.getItem('fitmanager_pending_academy_name')
-        const isAluno = Boolean(
-          effectiveInvite || intentFromStorage === 'aluno' || p?.role === 'ALUNO'
+        const inviteContext = Boolean(
+          effectiveInvite ||
+            intentFromStorage === 'aluno' ||
+            intentFromStorage === 'recepcionista' ||
+            p?.role === 'ALUNO' ||
+            p?.role === 'RECEPCIONISTA'
         )
-        if (pendingGym && !isAluno) setGymName(pendingGym)
+        if (pendingGym && !inviteContext) setGymName(pendingGym)
         const pendingPhone = sessionStorage.getItem('fitmanager_pending_phone')
         if (pendingPhone && !p?.telefone) setPhone(pendingPhone)
       } catch {
@@ -131,23 +149,58 @@ function CompletarCadastroForm() {
       await updateProfile(u, { displayName: fullName.trim() })
 
       const perfilAtual = await getPerfil(u.uid)
-      let academiaAluno = inviteAcademiaId
+      let academiaInvite = inviteAcademiaId
       try {
-        if (!academiaAluno) academiaAluno = sessionStorage.getItem('fitmanager_pending_academia_id')
+        if (!academiaInvite) academiaInvite = sessionStorage.getItem('fitmanager_pending_academia_id')
       } catch {
         /* ignore */
       }
-      if (!academiaAluno && perfilAtual?.role === 'ALUNO' && perfilAtual.academia_id) {
-        academiaAluno = perfilAtual.academia_id
+      if (
+        !academiaInvite &&
+        (perfilAtual?.role === 'ALUNO' || perfilAtual?.role === 'RECEPCIONISTA') &&
+        perfilAtual.academia_id
+      ) {
+        academiaInvite = perfilAtual.academia_id
       }
-      const isAlunoFlow = Boolean(
-        registerIntent === 'aluno' ||
-          perfilAtual?.role === 'ALUNO' ||
-          (academiaAluno != null && academiaAluno !== '' && registerIntent !== 'admin')
-      )
 
-      if (isAlunoFlow) {
-        if (!academiaAluno) {
+      const isRecepcionistaFlow =
+        registerIntent === 'recepcionista' || perfilAtual?.role === 'RECEPCIONISTA'
+
+      const isAlunoFlow =
+        !isRecepcionistaFlow &&
+        (registerIntent === 'aluno' ||
+          perfilAtual?.role === 'ALUNO' ||
+          (Boolean(academiaInvite) &&
+            registerIntent !== 'admin' &&
+            registerIntent !== 'recepcionista'))
+
+      function clearInviteSession() {
+        try {
+          sessionStorage.removeItem('fitmanager_pending_academia_id')
+          sessionStorage.removeItem('fitmanager_pending_phone')
+          sessionStorage.removeItem('fitmanager_register_intent')
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (isRecepcionistaFlow) {
+        if (!academiaInvite) {
+          setErrorMsg('Falta o convite da academia. Abra de novo o link de cadastro da receção.')
+          setSaving(false)
+          return
+        }
+        await registerPerfilAndClaimCpf({
+          userId: u.uid,
+          cpfDigits: digits,
+          nome_completo: fullName.trim(),
+          role: 'RECEPCIONISTA',
+          academia_id: academiaInvite,
+          telefone: phone.trim() || null,
+        })
+        clearInviteSession()
+      } else if (isAlunoFlow) {
+        if (!academiaInvite) {
           setErrorMsg('Falta o convite da academia. Abra de novo o link de cadastro do aluno.')
           setSaving(false)
           return
@@ -157,16 +210,10 @@ function CompletarCadastroForm() {
           cpfDigits: digits,
           nome_completo: fullName.trim(),
           role: 'ALUNO',
-          academia_id: academiaAluno,
+          academia_id: academiaInvite,
           telefone: phone.trim() || null,
         })
-        try {
-          sessionStorage.removeItem('fitmanager_pending_academia_id')
-          sessionStorage.removeItem('fitmanager_pending_phone')
-          sessionStorage.removeItem('fitmanager_register_intent')
-        } catch {
-          /* ignore */
-        }
+        clearInviteSession()
       } else {
         if (!gymName.trim()) {
           setErrorMsg('Informe o nome da academia.')
@@ -212,7 +259,21 @@ function CompletarCadastroForm() {
     )
   }
 
-  const isAlunoUi = Boolean(inviteAcademiaId || registerIntent === 'aluno')
+  const receptionLike =
+    registerIntent === 'recepcionista' || seededInviteRole === 'RECEPCIONISTA'
+  const studentLike =
+    !receptionLike &&
+    (registerIntent === 'aluno' ||
+      seededInviteRole === 'ALUNO' ||
+      (Boolean(inviteAcademiaId) && registerIntent !== 'admin'))
+
+  const skipGymField = receptionLike || studentLike
+
+  const completionTitle = receptionLike
+    ? 'Complete seu cadastro de receção'
+    : studentLike
+      ? 'Complete seu cadastro de aluno'
+      : 'Complete seu cadastro'
 
   return (
     <Card className="w-full max-w-lg border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
@@ -220,9 +281,7 @@ function CompletarCadastroForm() {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#F2B705]/20 text-[#F2B705] sm:mx-0">
           <UserCircle className="h-7 w-7" />
         </div>
-        <CardTitle className="text-2xl font-bold text-white">
-          {isAlunoUi ? 'Complete seu cadastro de aluno' : 'Complete seu cadastro'}
-        </CardTitle>
+        <CardTitle className="text-2xl font-bold text-white">{completionTitle}</CardTitle>
         <CardDescription className="text-[#A6A6A6]">
           Um CPF só pode ter uma conta. Usamos isso para evitar cadastros duplicados.
         </CardDescription>
@@ -234,7 +293,12 @@ function CompletarCadastroForm() {
               {errorMsg}
             </div>
           )}
-          {!isAlunoUi && (
+          {receptionLike && (
+            <p className="rounded-lg border border-[#F2B705]/20 bg-[#F2B705]/5 p-3 text-sm text-[#A6A6A6]">
+              Você será vinculado à academia como recepcionista: acesso à gestão diária, sem permissões de dono.
+            </p>
+          )}
+          {!skipGymField && (
             <div className="space-y-2">
               <Label htmlFor="gymName" className="text-[#A6A6A6]">
                 Nome da academia
@@ -245,7 +309,7 @@ function CompletarCadastroForm() {
                 onChange={(e) => setGymName(e.target.value)}
                 placeholder="Ex.: FitTech Gym"
                 className="h-11 border-[#585759] bg-[#0D0D0D] text-white"
-                required={!isAlunoUi}
+                required={!skipGymField}
               />
             </div>
           )}

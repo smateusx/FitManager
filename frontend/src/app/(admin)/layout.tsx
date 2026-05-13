@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import Link from 'next/link'
-import { userInitials } from '@/lib/user-initials'
+import { ProfileAvatar } from '@/components/profile-avatar'
 import { Menu, X } from 'lucide-react'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -59,9 +59,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className="p-5 sm:p-6 border-b border-[#585759]/20 shrink-0">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-[#F2B705] tracking-tighter">
-              FitManager<span className="text-white">.</span>
-            </h1>
+            <Link href="/" className="inline-block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]">
+              <h1 className="text-xl sm:text-2xl font-black text-[#F2B705] tracking-tighter">
+                FitManager<span className="text-white">.</span>
+              </h1>
+            </Link>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {isReceptionist && (
                 <span className="text-[10px] bg-[#F2B705] text-[#0D0D0D] px-2 py-0.5 rounded font-bold uppercase tracking-wider">
@@ -128,12 +130,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               : 'text-[#A6A6A6] hover:bg-[#585759]/20 hover:text-white'
           }`}
         >
-          <div
-            className="w-8 h-8 rounded-full bg-[#F2B705]/15 border border-[#F2B705]/35 flex items-center justify-center text-[10px] font-bold text-[#F2B705] shrink-0"
-            aria-hidden
-          >
-            {userInitials(profile.nome_completo)}
-          </div>
+          <ProfileAvatar
+            fotoUrl={profile.foto_url}
+            name={profile.nome_completo || 'Perfil'}
+            sizeClass="h-8 w-8 text-[10px] border border-[#F2B705]/35"
+          />
           <span className="flex-1 truncate text-sm">{profile.nome_completo || 'Perfil'}</span>
         </Link>
 
@@ -162,9 +163,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen min-h-[100dvh] bg-[#0D0D0D] text-white flex flex-col lg:flex-row">
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-14 border-b border-[#585759]/30 bg-[#0D0D0D]/95 backdrop-blur-md">
-        <span className="font-black text-[#F2B705] tracking-tighter text-lg">
+        <Link
+          href="/"
+          className="font-black text-[#F2B705] tracking-tighter text-lg rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]"
+        >
           FitManager<span className="text-white">.</span>
-        </span>
+        </Link>
         <button
           type="button"
           className="p-2 rounded-lg text-white bg-[#585759]/25 border border-[#585759]/40"
