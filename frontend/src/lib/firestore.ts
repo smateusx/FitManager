@@ -19,6 +19,14 @@ import { getDb } from '@/lib/firebase'
 
 export type Role = 'ADMIN' | 'RECEPCIONISTA' | 'ALUNO'
 
+/** Normaliza valores vindos do Firestore (maiúsculas / espaços). */
+export function normalizeRole(raw: unknown): Role | null {
+  if (raw == null || raw === '') return null
+  const s = String(raw).trim().toUpperCase().replace(/\s+/g, '_')
+  if (s === 'ADMIN' || s === 'RECEPCIONISTA' || s === 'ALUNO') return s
+  return null
+}
+
 function tsToIso(v: unknown): string {
   if (v && typeof (v as Timestamp).toDate === 'function') {
     return (v as Timestamp).toDate().toISOString()
@@ -40,7 +48,7 @@ export async function getPerfil(userId: string) {
   const d = snap.data()!
   return {
     id: snap.id,
-    role: d.role as Role,
+    role: normalizeRole(d.role),
     academia_id: d.academia_id ?? null,
     nome_completo: d.nome_completo ?? null,
     telefone: d.telefone ?? null,
@@ -62,6 +70,28 @@ export async function setPerfil(
   await setDoc(
     doc(getDb(), 'perfis', userId),
     { ...data, updated_at: serverTimestamp() },
+    { merge: true }
+  )
+}
+
+/** Perfil mínimo de aluno convidado (antes do CPF), para não perder academia_id sem sessionStorage. */
+export async function seedAlunoInviteProfile(params: {
+  userId: string
+  academia_id: string
+  nome_completo?: string | null
+  telefone?: string | null
+}): Promise<void> {
+  const { userId, academia_id, nome_completo, telefone } = params
+  await setDoc(
+    doc(getDb(), 'perfis', userId),
+    {
+      role: 'ALUNO',
+      academia_id,
+      nome_completo: nome_completo ?? null,
+      telefone: telefone ?? null,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    },
     { merge: true }
   )
 }
