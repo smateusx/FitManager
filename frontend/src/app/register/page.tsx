@@ -1,150 +1,228 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { supabase } from '@/lib/supabase'
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signOut,
+  updateProfile,
+} from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { AuthShell } from '@/components/auth-shell'
+import { Building2, Mail } from 'lucide-react'
 
 export default function RegisterPage() {
   const [gymName, setGymName] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordConfirm, setPasswordConfirm] = useState('')
   const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [sent, setSent] = useState(false)
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
-    // 1. Criar a conta de autenticação (Gatilho fará ele nascer como ALUNO com academia_id null)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { nome_completo: fullName } }
-    })
+    setErrorMsg('')
 
-    if (authError) {
-      alert('Erro ao criar conta: ' + authError.message)
+    if (password !== passwordConfirm) {
+      setErrorMsg('As senhas não coincidem.')
       setLoading(false)
       return
     }
 
-    // Como no Supabase o login automático acontece após o signup, o usuário já estará "logado" nesta sessão.
-    // 2. Criar a academia no banco de dados
-    const { data: gymData, error: gymError } = await supabase
-      .from('academias')
-      .insert({ nome: gymName })
-      .select()
-      .single()
-
-    if (gymError) {
-      console.error('Gatilho/RLS Error:', gymError)
-      alert('Erro (Acesso DB): ' + gymError.message)
-    } else if (gymData && authData.user) {
-      // 3. Elevar os privilégios do usuário recém-criado para ADMIN da sua própria academia
-      await supabase.from('perfis').update({
-        academia_id: gymData.id,
-        role: 'ADMIN'
-      }).eq('id', authData.user.id)
-      
-      alert('Conta de academia criada com sucesso!')
-      router.push('/dashboard')
+    if (password.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.')
+      setLoading(false)
+      return
     }
 
-    setLoading(false)
+    try {
+      const auth = getFirebaseAuth()
+      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
+      await updateProfile(cred.user, { displayName: fullName.trim() })
+
+      await sendEmailVerification(cred.user)
+
+      try {
+        sessionStorage.setItem('fitmanager_pending_academy_name', gymName.trim())
+        sessionStorage.setItem('fitmanager_register_intent', 'admin')
+      } catch {
+        /* ignore */
+      }
+
+      await signOut(auth)
+      setSent(true)
+    } catch (err: unknown) {
+      const code =
+        err && typeof err === 'object' && 'code' in err && typeof (err as { code: string }).code === 'string'
+          ? (err as { code: string }).code
+          : ''
+      if (code === 'auth/email-already-in-use') {
+        setErrorMsg('Este e-mail já está em uso. Faça login ou use outro endereço.')
+      } else if (code === 'auth/weak-password') {
+        setErrorMsg('Use uma senha mais forte (pelo menos 6 caracteres).')
+      } else {
+        const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+        setErrorMsg('Não foi possível criar a conta: ' + msg)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <AuthShell variant="wide">
+        <Card className="w-full border-emerald-500/25 bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
+          <CardHeader className="space-y-2 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+              <Mail className="h-7 w-7" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-white">Verifique seu e-mail</CardTitle>
+            <CardDescription className="text-[#A6A6A6]">
+              Abra a mensagem que enviamos para <span className="font-medium text-white">{email.trim()}</span>, clique
+              no link e depois faça login para continuar o cadastro da academia (nome da unidade e CPF).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button
+              type="button"
+              className="h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] hover:bg-[#BF9004]"
+              onClick={() => router.push('/login')}
+            >
+              Ir para o login
+            </Button>
+            <p className="text-center text-xs text-[#585759]">Não viu o e-mail? Confira spam e lixo eletrônico.</p>
+          </CardContent>
+        </Card>
+      </AuthShell>
+    )
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] p-4 relative overflow-hidden">
-      {/* Background gradients using brand colors */}
-      <div className="absolute top-0 right-1/4 w-[600px] h-[400px] bg-[#BF9004]/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-[500px] h-[300px] bg-[#F2B705]/10 blur-[100px] rounded-full pointer-events-none" />
-      
-      <Card className="w-full max-w-lg border-[#585759] bg-[#0D0D0D]/80 backdrop-blur-xl shadow-2xl z-10">
-        <CardHeader className="space-y-2 text-center pb-6">
-          <div className="mx-auto w-12 h-12 bg-[#F2B705] rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-[#F2B705]/20">
-            <svg className="w-6 h-6 text-[#0D0D0D]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+    <AuthShell variant="wide">
+      <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
+        <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#F2B705] shadow-lg shadow-[#F2B705]/20 sm:mx-0">
+            <Building2 className="h-6 w-6 text-[#0D0D0D]" aria-hidden />
           </div>
-          <CardTitle className="text-3xl font-bold tracking-tight text-white">Cadastre sua Academia</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Cadastre sua academia</CardTitle>
           <CardDescription className="text-[#A6A6A6]">
-            Crie sua conta administrativa e comece a gerenciar seus alunos com o FitManager.
+            Criamos sua conta com Firebase Auth. Você confirma o e-mail, faz login e completa CPF e dados da unidade.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-5">
+            {errorMsg && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
+                {errorMsg}
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="gymName" className="text-[#A6A6A6]">Nome da Academia</Label>
-              <Input 
-                id="gymName" 
-                placeholder="Ex: FitTech GYM" 
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+              <Label htmlFor="gymName" className="text-[#A6A6A6]">
+                Nome da academia (para depois do login)
+              </Label>
+              <Input
+                id="gymName"
+                placeholder="Ex.: FitTech Gym"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={gymName}
                 onChange={(e) => setGymName(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#A6A6A6]">Seu Nome Completo</Label>
-              <Input 
-                id="fullName" 
-                placeholder="João Silva" 
-                className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+              <Label htmlFor="fullName" className="text-[#A6A6A6]">
+                Seu nome completo
+              </Label>
+              <Input
+                id="fullName"
+                placeholder="João Silva"
+                className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-[#A6A6A6]">E-mail Comercial</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="admin@academia.com" 
-                  className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="email" className="text-[#A6A6A6]">
+                  E-mail
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="admin@academia.com"
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-[#A6A6A6]">Senha</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="••••••••" 
-                  className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-11"
+                <Label htmlFor="password" className="text-[#A6A6A6]">
+                  Senha (mín. 6 caracteres)
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  minLength={6}
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="passwordConfirm" className="text-[#A6A6A6]">
+                  Confirmar senha
+                </Label>
+                <Input
+                  id="passwordConfirm"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Repita a senha"
+                  minLength={6}
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-            <Button 
-              type="submit" 
-              className="w-full h-11 bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold transition-all shadow-lg shadow-[#F2B705]/20 mt-2"
+            <Button
+              type="submit"
+              className="mt-2 h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
               disabled={loading}
             >
-              {loading ? 'Criando conta...' : 'Criar minha conta gratuita'}
+              {loading ? 'Criando conta...' : 'Criar conta e enviar e-mail'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4 pt-4 border-t border-[#585759]/50 mt-4">
-          <div className="text-sm text-center text-[#A6A6A6]">
-            Já possui uma conta?{' '}
-            <Link href="/login" className="font-semibold text-[#F2B705] hover:text-[#BF9004] transition-colors">
-              Fazer login
+        <CardFooter className="flex flex-col space-y-3 border-t border-[#585759]/50 pt-4">
+          <p className="text-center text-sm text-[#A6A6A6]">
+            Já tem conta?{' '}
+            <Link href="/login" className="font-semibold text-[#F2B705] transition-colors hover:text-[#BF9004]">
+              Entrar
             </Link>
-          </div>
+          </p>
+          <Link href="/" className="block text-center text-xs text-[#585759] transition-colors hover:text-[#A6A6A6]">
+            ← Voltar ao início
+          </Link>
         </CardFooter>
       </Card>
-    </div>
+    </AuthShell>
   )
 }

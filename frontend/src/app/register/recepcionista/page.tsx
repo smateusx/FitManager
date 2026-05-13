@@ -13,12 +13,12 @@ import {
   sendEmailVerification,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { seedAlunoInviteProfile } from '@/lib/firestore'
+import { seedRecepcionistaInviteProfile } from '@/lib/firestore'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
 import { CheckCircle2, Mail } from 'lucide-react'
 
-function RegisterAlunoForm() {
+function RegisterRecepcionistaForm() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -36,7 +36,7 @@ function RegisterAlunoForm() {
     if (!academiaId) return
     try {
       sessionStorage.setItem('fitmanager_pending_academia_id', academiaId)
-      sessionStorage.setItem('fitmanager_register_intent', 'aluno')
+      sessionStorage.setItem('fitmanager_register_intent', 'recepcionista')
     } catch {
       /* ignore */
     }
@@ -62,7 +62,7 @@ function RegisterAlunoForm() {
       const auth = getFirebaseAuth()
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password)
       await updateProfile(cred.user, { displayName: fullName.trim() })
-      await seedAlunoInviteProfile({
+      await seedRecepcionistaInviteProfile({
         userId: cred.user.uid,
         academia_id: academiaId,
         nome_completo: fullName.trim() || null,
@@ -121,15 +121,17 @@ function RegisterAlunoForm() {
     <AuthShell>
       <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
         <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
-          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Portal do aluno</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Convite — receção
+          </CardTitle>
           <CardDescription className="text-[#A6A6A6]">
-            Use o link que sua academia enviou. Após criar a conta, confirme o e-mail antes de entrar.
+            Cadastro para equipe da receção: alunos, fichas e planos, sem acesso de administrador.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!academiaId && (
             <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400" role="alert">
-              Link de convite inválido. Solicite um novo link à sua academia.
+              Link de convite inválido. Solicite um novo link ao administrador da academia.
             </div>
           )}
           {errorMsg && (
@@ -231,7 +233,7 @@ function RegisterAlunoForm() {
   )
 }
 
-export default function RegisterAlunoPage() {
+export default function RegisterRecepcionistaPage() {
   return (
     <Suspense
       fallback={
@@ -240,7 +242,7 @@ export default function RegisterAlunoPage() {
         </div>
       }
     >
-      <RegisterAlunoForm />
+      <RegisterRecepcionistaForm />
     </Suspense>
   )
 }

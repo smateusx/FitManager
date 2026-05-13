@@ -1,0 +1,12 @@
+# Copie para a raiz do repositório como .env.firebase.local
+# PowerShell: Copy-Item scripts\firebase-env.example .env.firebase.local
+#
+# Não faça commit deste ficheiro nem partilhe o token.
+#
+# Gera o token na pasta do projeto:
+#   npx firebase-tools login:ci
+#
+# FIREBASE_PROJECT_ID = Firebase Console → Definições do projeto → ID do projeto
+
+FIREBASE_TOKEN=
+FIREBASE_PROJECT_ID=

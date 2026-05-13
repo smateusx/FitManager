@@ -1,0 +1,8 @@
+/** First two initials from a display name for avatar placeholders (Firebase only; no image uploads). */
+export function userInitials(name: string | null | undefined): string {
+  const t = (name ?? '').trim()
+  if (!t) return '?'
+  const parts = t.split(/\s+/).filter(Boolean)
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase()
+  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase()
+}

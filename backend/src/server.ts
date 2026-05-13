@@ -10,6 +10,13 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'FitManager API',
+    hint: 'Use GET /health for a readiness check.',
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'FitManager API is running' });
 });

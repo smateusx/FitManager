@@ -1,15 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { signOut } from 'firebase/auth'
+import { getFirebaseAuth } from '@/lib/firebase'
+import {
+  getPerfil,
+  insertRegistroCarga,
+  listFichasByAluno,
+  listMatriculasByAluno,
+} from '@/lib/firestore'
 import { 
   Dumbbell, 
   ChevronDown, 
   ChevronUp, 
   LogOut, 
   TrendingUp, 
-  User, 
   CreditCard, 
   Info, 
   MessageSquare, 
@@ -18,6 +25,7 @@ import {
 } from 'lucide-react'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
+import { ProfileAvatar } from '@/components/profile-avatar'
 
 type Exercicio = {
   id: string
@@ -42,58 +50,50 @@ export default function MeuTreinoPage() {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [userName, setUserName] = useState('')
-  const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [registeringId, setRegisteringId] = useState<string | null>(null)
   const [showingChartId, setShowingChartId] = useState<string | null>(null)
   const [cargaValue, setCargaValue] = useState('')
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [perfilData, setPerfilData] = useState<any>(null)
+  const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
-  const [matriculas, setMatriculas] = useState<any[]>([])
+  const [matriculas, setMatriculas] = useState<
+    Awaited<ReturnType<typeof listMatriculasByAluno>>
+  >([])
 
   const router = useRouter()
 
   useEffect(() => {
     async function loadData() {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
+      const u = getFirebaseAuth().currentUser
+
+      if (!u) {
         router.push('/login')
         return
       }
 
-      // Buscar perfil para pegar nome e academia_id
-      const { data: perfil } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
+      if (!u.emailVerified) {
+        router.push('/verificar-email')
+        return
+      }
+
+      const perfil = await getPerfil(u.uid)
+      if (!perfil?.cpf) {
+        router.push('/completar-cadastro')
+        return
+      }
 
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
-        setUserAvatar(perfil.avatar_url)
-        setUserId(session.user.id)
-        setPerfilData(perfil)
+        setUserId(u.uid)
+        setUserPhotoUrl(perfil.foto_url ?? null)
       }
 
-      // Buscar as fichas de treino do aluno
-      const { data: fichasData } = await supabase
-        .from('fichas_treino')
-        .select('*, exercicios(*)')
-        .eq('aluno_id', session.user.id)
-        .order('criado_em', { ascending: false })
+      const fichasData = await listFichasByAluno(u.uid)
+      setFichas((fichasData as Ficha[]) ?? [])
 
-      setFichas((fichasData as any) ?? [])
-
-      // Buscar histórico de matrículas
-      const { data: matriculasData } = await supabase
-        .from('matriculas')
-        .select('*, planos(nome, valor, duracao_dias)')
-        .eq('aluno_id', session.user.id)
-        .order('data_vencimento', { ascending: false })
-
+      const matriculasData = await listMatriculasByAluno(u.uid)
       setMatriculas(matriculasData || [])
       setLoading(false)
     }
@@ -102,7 +102,7 @@ export default function MeuTreinoPage() {
   }, [router])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut(getFirebaseAuth())
     router.push('/login')
   }
 
@@ -111,17 +111,13 @@ export default function MeuTreinoPage() {
     
     setIsSaving(true)
     try {
-      const { error } = await supabase
-        .from('registros_carga')
-        .insert({
-          aluno_id: userId,
-          exercicio_id: ex.id,
-          carga: cargaValue,
-          repeticoes: parseInt(repsValue),
-          data_registro: new Date().toISOString()
-        })
-
-      if (error) throw error
+      await insertRegistroCarga({
+        aluno_id: userId,
+        exercicio_id: ex.id,
+        carga: cargaValue,
+        repeticoes: parseInt(repsValue),
+        data_registro: new Date().toISOString(),
+      })
       
       setRegisteringId(null)
       setCargaValue('')
@@ -138,40 +134,43 @@ export default function MeuTreinoPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0D0D0D]">
-        <div className="w-8 h-8 border-4 border-[#F2B705] border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex min-h-[50vh] items-center justify-center bg-[#0D0D0D] py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#F2B705] border-t-transparent"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white">
+    <div className="min-h-0 bg-[#0D0D0D] text-white">
       {/* Glossy Header Background */}
       <div className="fixed top-0 inset-x-0 h-40 bg-gradient-to-b from-[#F2B705]/5 to-transparent pointer-events-none" />
 
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-[#0D0D0D]/80 backdrop-blur-md border-b border-[#585759]/20">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#F2B705] rounded-lg flex items-center justify-center">
-              <Dumbbell className="w-5 h-5 text-[#0D0D0D]" />
+        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F2B705]">
+              <Dumbbell className="h-5 w-5 text-[#0D0D0D]" />
             </div>
-            <span className="font-black text-xl tracking-tighter uppercase">FitManager</span>
-          </div>
+            <span className="text-xl font-black uppercase tracking-tighter">FitManager</span>
+          </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button 
               onClick={() => router.push('/meu-perfil')}
-              className="flex items-center gap-3 px-3 py-1.5 rounded-xl hover:bg-[#585759]/20 transition-all border border-transparent hover:border-[#585759]/30 group"
+              className="group flex min-w-0 items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 transition-all hover:border-[#585759]/30 hover:bg-[#585759]/20 sm:gap-3 sm:px-3"
             >
-              <div className="w-8 h-8 rounded-full bg-[#585759]/20 flex items-center justify-center overflow-hidden border border-[#585759]/30 group-hover:border-[#F2B705]/50 transition-all">
-                {userAvatar ? (
-                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-4 h-4 text-[#A6A6A6] group-hover:text-[#F2B705]" />
-                )}
-              </div>
-              <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white hidden sm:inline">{userName.split(' ')[0]}</span>
+              <ProfileAvatar
+                fotoUrl={userPhotoUrl}
+                name={userName}
+                sizeClass="h-8 w-8 text-[10px] border border-[#F2B705]/35"
+              />
+              <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white truncate hidden sm:inline max-w-[8rem]">
+                {userName.split(' ')[0]}
+              </span>
             </button>
 
             <button 
@@ -185,7 +184,7 @@ export default function MeuTreinoPage() {
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto px-6 py-10 relative z-10">
+      <main className="relative z-10 mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
         {/* Greeting */}
         <div className="mb-8">
           <p className="text-[#A6A6A6] text-sm uppercase tracking-widest font-semibold mb-1">Portal do Aluno</p>
