@@ -3,7 +3,7 @@ import { Dumbbell, Users, ClipboardList, CreditCard } from 'lucide-react'
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0D0D0D] text-white">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0D0D0D] text-white [hyphens:none]">
       <header className="sticky top-0 z-20 border-b border-[#585759]/20 bg-[#0D0D0D]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
@@ -32,7 +32,7 @@ export default function Home() {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-14 sm:px-6 sm:py-20">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#585759]">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#585759]">
           Gestão para academias
         </p>
         <h1 className="mt-3 text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
