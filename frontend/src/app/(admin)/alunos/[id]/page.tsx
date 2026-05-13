@@ -90,8 +90,12 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [renewValor, setRenewValor] = useState('')
   const [isRenewing, setIsRenewing] = useState(false)
   
-  const { loading: authLoading, isAdmin } = useAuth()
+  const { loading: authLoading, isAdmin, isReceptionist } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    if (isReceptionist && activeTab === 'financeiro') setActiveTab('perfil')
+  }, [isReceptionist, activeTab])
 
   useEffect(() => {
     if (authLoading) return
@@ -266,7 +270,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         {/* Tabs */}
         <div className="-mx-1 mb-6 mt-6 flex gap-1 overflow-x-auto border-b border-[#585759]/30 px-1">
           {[
-            { id: 'perfil' as const, label: 'Visão Geral', icon: <UserIcon className="h-4 w-4 shrink-0" /> },
+            { id: 'perfil' as const, label: 'Visão geral', icon: <UserIcon className="h-4 w-4 shrink-0" /> },
             { id: 'treinos' as const, label: 'Treinos', icon: <Dumbbell className="h-4 w-4 shrink-0" /> },
             {
               id: 'evolucao' as const,
@@ -278,7 +282,9 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                 </svg>
               ),
             },
-            { id: 'financeiro' as const, label: 'Financeiro', icon: <CreditCard className="h-4 w-4 shrink-0" /> },
+            ...(isReceptionist
+              ? []
+              : [{ id: 'financeiro' as const, label: 'Financeiro', icon: <CreditCard className="h-4 w-4 shrink-0" /> }]),
           ].map((t) => (
             <button
               key={t.id}
@@ -309,11 +315,11 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-[#585759] text-xs uppercase tracking-wider font-semibold">Nome Completo</p>
-                    <p className="text-white mt-1">{aluno?.nome_completo || '—'}</p>
+                    <p className="text-white mt-1">{aluno?.nome_completo || 'Não informado'}</p>
                   </div>
                   <div>
                     <p className="text-[#585759] text-xs uppercase tracking-wider font-semibold">Telefone</p>
-                    <p className="text-white mt-1">{aluno?.telefone || '—'}</p>
+                    <p className="text-white mt-1">{aluno?.telefone || 'Não informado'}</p>
                   </div>
                   <div>
                     <p className="text-[#585759] text-xs uppercase tracking-wider font-semibold">E-mail</p>
@@ -398,7 +404,9 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                               <td className="py-2.5 pr-4 text-white font-medium">{ex.nome}</td>
                               <td className="py-2.5 px-2 text-center">{ex.series}</td>
                               <td className="py-2.5 px-2 text-center">{ex.repeticoes}</td>
-                              <td className="py-2.5 px-2 text-center font-bold text-[#F2B705]">{ex.carga || '—'}</td>
+                              <td className="py-2.5 px-2 text-center font-bold text-[#F2B705]">
+                                {ex.carga || 'Sem registro'}
+                              </td>
                               <td className="py-2.5 px-2 text-center text-xs">{ex.descanso}</td>
                             </tr>
                           ))}
@@ -499,7 +507,9 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                           <td className="p-4 text-white font-medium">{m.planos?.nome || 'Personalizado'}</td>
                           <td className="p-4 text-[#A6A6A6]">{new Date(m.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
                           <td className="p-4 text-[#A6A6A6]">{new Date(m.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
-                          <td className="p-4 text-[#F2B705] font-bold">R$ {m.valor_pago?.toFixed(2).replace('.', ',') || '—'}</td>
+                          <td className="p-4 text-[#F2B705] font-bold">
+                            R$ {m.valor_pago != null ? m.valor_pago.toFixed(2).replace('.', ',') : 'não informado'}
+                          </td>
                           <td className="p-4 text-center">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                               m.status === 'ATIVO' ? 'bg-emerald-500/20 text-emerald-400' : 
@@ -544,8 +554,10 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                   className="w-full h-11 px-4 rounded-xl bg-[#0D0D0D] border border-[#585759]/50 text-white focus:border-[#F2B705] outline-none transition-all"
                 >
                   <option value="">Selecione um plano...</option>
-                  {planos.map(p => (
-                    <option key={p.id} value={p.id}>{p.nome} — R$ {p.valor.toFixed(2)}</option>
+                  {planos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome} · R$ {p.valor.toFixed(2).replace('.', ',')}
+                    </option>
                   ))}
                 </select>
               </div>

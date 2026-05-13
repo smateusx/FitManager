@@ -168,12 +168,27 @@ export async function registerPerfilAndClaimCpf(params: {
   })
 }
 
-export async function createAcademia(nome: string) {
+export async function createAcademia(nome: string, whatsapp_contato: string) {
   const ref = await addDoc(collection(getDb(), 'academias'), {
     nome,
+    whatsapp_contato,
     created_at: serverTimestamp(),
   })
   return ref.id
+}
+
+export async function getAcademia(academiaId: string) {
+  const snap = await getDoc(doc(getDb(), 'academias', academiaId))
+  if (!snap.exists()) return null
+  const d = snap.data()
+  return {
+    nome: (d.nome as string) ?? '',
+    whatsapp_contato: (d.whatsapp_contato as string | undefined) ?? null,
+  }
+}
+
+export async function updateAcademiaContact(academiaId: string, whatsapp_contato: string) {
+  await updateDoc(doc(getDb(), 'academias', academiaId), { whatsapp_contato })
 }
 
 export async function listAlunosByAcademia(academiaId: string) {
@@ -181,6 +196,21 @@ export async function listAlunosByAcademia(academiaId: string) {
     collection(getDb(), 'perfis'),
     where('academia_id', '==', academiaId),
     where('role', '==', 'ALUNO')
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map((s) => ({
+    id: s.id,
+    nome_completo: s.data().nome_completo ?? '',
+    telefone: s.data().telefone ?? null,
+    created_at: tsToIso(s.data().created_at),
+  }))
+}
+
+export async function listRecepcionistasByAcademia(academiaId: string) {
+  const q = query(
+    collection(getDb(), 'perfis'),
+    where('academia_id', '==', academiaId),
+    where('role', '==', 'RECEPCIONISTA')
   )
   const snap = await getDocs(q)
   return snap.docs.map((s) => ({
@@ -418,6 +448,36 @@ export async function deleteFicha(id: string) {
   await deleteDoc(doc(getDb(), 'fichas_treino', id))
 }
 
+export async function updateFichaTreino(
+  id: string,
+  data: { nome: string; objetivo: string; aluno_id: string }
+) {
+  await updateDoc(doc(getDb(), 'fichas_treino', id), {
+    nome: data.nome,
+    objetivo: data.objetivo,
+    aluno_id: data.aluno_id,
+  })
+}
+
+export async function replaceExerciciosFicha(
+  fichaId: string,
+  rows: { nome: string; series: number; repeticoes: string; carga: string; descanso: string }[]
+) {
+  const exQ = query(collection(getDb(), 'exercicios'), where('ficha_id', '==', fichaId))
+  const exSnap = await getDocs(exQ)
+  for (const e of exSnap.docs) await deleteDoc(e.ref)
+  const exRows = rows.map((row, i) => ({
+    nome: row.nome,
+    series: row.series,
+    repeticoes: row.repeticoes,
+    carga: row.carga,
+    descanso: row.descanso,
+    ordem: i,
+    ficha_id: fichaId,
+  }))
+  await insertExercicios(exRows)
+}
+
 export async function insertRegistroCarga(data: Record<string, unknown>) {
   await addDoc(collection(getDb(), 'registros_carga'), {
     ...data,
@@ -590,6 +650,11 @@ export async function getAlunoComAcademia(alunoId: string) {
     ...p,
     id: snap.id,
     created_at: tsToIso(p.created_at),
-    academias: ac?.exists() ? { nome: ac.data()?.nome } : null,
+    academias: ac?.exists()
+      ? {
+          nome: ac.data()?.nome,
+          whatsapp_contato: (ac.data()?.whatsapp_contato as string | undefined) ?? null,
+        }
+      : null,
   }
 }

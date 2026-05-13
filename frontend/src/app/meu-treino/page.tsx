@@ -10,7 +10,9 @@ import {
   insertRegistroCarga,
   listFichasByAluno,
   listMatriculasByAluno,
+  getAcademia,
 } from '@/lib/firestore'
+import { normalizeWhatsAppDigits, whatsAppChatUrl } from '@/lib/whatsapp-contact'
 import { 
   Dumbbell, 
   ChevronDown, 
@@ -60,6 +62,7 @@ export default function MeuTreinoPage() {
   const [matriculas, setMatriculas] = useState<
     Awaited<ReturnType<typeof listMatriculasByAluno>>
   >([])
+  const [academiaWaHref, setAcademiaWaHref] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -86,6 +89,17 @@ export default function MeuTreinoPage() {
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserId(u.uid)
+        if (perfil.academia_id) {
+          const ac = await getAcademia(perfil.academia_id)
+          const raw = ac?.whatsapp_contato
+          if (raw?.replace(/\D/g, '')) {
+            setAcademiaWaHref(whatsAppChatUrl(normalizeWhatsAppDigits(raw)))
+          } else {
+            setAcademiaWaHref(null)
+          }
+        } else {
+          setAcademiaWaHref(null)
+        }
       }
 
       const fichasData = await listFichasByAluno(u.uid)
@@ -182,9 +196,25 @@ export default function MeuTreinoPage() {
         {/* Greeting */}
         <div className="mb-8">
           <p className="text-[#A6A6A6] text-sm uppercase tracking-widest font-semibold mb-1">Portal do Aluno</p>
-          <h1 className="text-3xl font-bold text-white">Olá, {userName.split(' ')[0]}! 👋</h1>
+          <h1 className="text-3xl font-bold text-white">Olá, {userName.split(' ')[0]}!</h1>
           <p className="text-[#A6A6A6] mt-1">Aqui estão suas informações e treinos.</p>
         </div>
+
+        {academiaWaHref ? (
+          <div className="mb-8 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 sm:px-5">
+            <p className="text-sm text-[#A6A6A6]">
+              Dúvidas sobre treino ou sobre a academia? Fale com a equipe pelo WhatsApp cadastrado pela academia.
+            </p>
+            <a
+              href={academiaWaHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#25D366]/20 hover:bg-[#128C7E]"
+            >
+              Abrir WhatsApp da academia
+            </a>
+          </div>
+        ) : null}
 
         {/* Tab Switcher */}
         <div className="flex p-1 bg-[#585759]/10 rounded-2xl mb-8 border border-[#585759]/20">

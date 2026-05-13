@@ -114,7 +114,7 @@ export default function VerificarEmailPage() {
             className="h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] hover:bg-[#BF9004]"
             onClick={handleCheck}
           >
-            Já confirmei — continuar
+            Já confirmei: continuar
           </Button>
           <Button
             type="button"

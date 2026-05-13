@@ -36,7 +36,7 @@ export default function Home() {
           Gestão da sua academia num só lugar.
         </h1>
         <p className="mt-4 max-w-xl text-[#A6A6A6] leading-relaxed">
-          Alunos, fichas de treino e mensalidades — menos papel e menos retrabalho na receção.
+          Menos papel e menos retrabalho na receção da academia.
         </p>
 
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">

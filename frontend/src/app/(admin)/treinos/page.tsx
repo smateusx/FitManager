@@ -10,8 +10,10 @@ import {
   insertFicha,
   listAlunosByAcademia,
   listFichasByAcademia,
+  replaceExerciciosFicha,
+  updateFichaTreino,
 } from '@/lib/firestore'
-import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,10 +43,10 @@ type AlunoOption = {
   nome_completo: string | null
 }
 
-const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10-12', carga: '', descanso: '60s' }
+const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10 a 12', carga: '', descanso: '60s' }
 
 export default function TreinosPage() {
-  const { loading: authLoading, isReceptionist } = useAuth()
+  const { loading: authLoading, isAdmin } = useAuth()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [alunos, setAlunos] = useState<AlunoOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +60,7 @@ export default function TreinosPage() {
   const [alunoSel, setAlunoSel] = useState('')
   const [exercicios, setExercicios] = useState<Exercicio[]>([{ ...BLANK_EXERCICIO }])
   const [saving, setSaving] = useState(false)
+  const [editingFichaId, setEditingFichaId] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -101,48 +104,96 @@ export default function TreinosPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!academiaId || !alunoSel || isReceptionist) return
+    if (!academiaId || !alunoSel) return
     setSaving(true)
 
-    const { id: fichaId } = await insertFicha({
-      nome: nomeFicha,
-      objetivo,
-      aluno_id: alunoSel,
-      academia_id: academiaId,
-    })
+    const filtered = exercicios.filter((ex) => ex.nome.trim())
 
-    const exRows = exercicios
-      .filter((ex) => ex.nome.trim())
-      .map((ex, i) => ({
-        nome: ex.nome,
-        series: ex.series,
-        repeticoes: ex.repeticoes,
-        carga: ex.carga,
-        descanso: ex.descanso,
-        ordem: i,
-        ficha_id: fichaId,
-      }))
+    try {
+      if (editingFichaId) {
+        await updateFichaTreino(editingFichaId, {
+          nome: nomeFicha,
+          objetivo,
+          aluno_id: alunoSel,
+        })
+        await replaceExerciciosFicha(
+          editingFichaId,
+          filtered.map((ex) => ({
+            nome: ex.nome,
+            series: ex.series,
+            repeticoes: ex.repeticoes,
+            carga: ex.carga,
+            descanso: ex.descanso,
+          }))
+        )
+      } else {
+        const { id: fichaId } = await insertFicha({
+          nome: nomeFicha,
+          objetivo,
+          aluno_id: alunoSel,
+          academia_id: academiaId,
+        })
 
-    if (exRows.length > 0) {
-      await insertExercicios(exRows)
+        const exRows = filtered.map((ex, i) => ({
+          nome: ex.nome,
+          series: ex.series,
+          repeticoes: ex.repeticoes,
+          carga: ex.carga,
+          descanso: ex.descanso,
+          ordem: i,
+          ficha_id: fichaId,
+        }))
+
+        if (exRows.length > 0) {
+          await insertExercicios(exRows)
+        }
+      }
+
+      setShowModal(false)
+      resetModal()
+      fetchAll()
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
-    setShowModal(false)
-    resetModal()
-    fetchAll()
   }
 
   const handleDelete = async (id: string) => {
-    if (isReceptionist) return
+    if (!isAdmin) return
     if (!confirm('Tem certeza que deseja excluir esta ficha?')) return
     await deleteFicha(id)
     fetchAll()
   }
 
   const resetModal = () => {
-    setNomeFicha(''); setObjetivo(''); setAlunoSel('')
+    setEditingFichaId(null)
+    setNomeFicha('')
+    setObjetivo('')
+    setAlunoSel('')
     setExercicios([{ ...BLANK_EXERCICIO }])
+  }
+
+  const openCreateModal = () => {
+    resetModal()
+    setShowModal(true)
+  }
+
+  const openEditModal = (ficha: Ficha) => {
+    setEditingFichaId(ficha.id)
+    setNomeFicha(ficha.nome)
+    setObjetivo(ficha.objetivo ?? '')
+    setAlunoSel(ficha.aluno_id)
+    setExercicios(
+      ficha.exercicios?.length
+        ? ficha.exercicios.map((ex) => ({
+            nome: ex.nome,
+            series: Number(ex.series) || 1,
+            repeticoes: String(ex.repeticoes ?? ''),
+            carga: String(ex.carga ?? ''),
+            descanso: String(ex.descanso ?? ''),
+          }))
+        : [{ ...BLANK_EXERCICIO }]
+    )
+    setShowModal(true)
   }
 
   return (
@@ -153,14 +204,12 @@ export default function TreinosPage() {
             <h1 className="text-2xl font-bold text-[#F2B705] sm:text-3xl">Fichas de Treino</h1>
             <p className="mt-1 text-sm text-[#A6A6A6] sm:text-base">Crie e gerencie os treinos dos seus alunos.</p>
           </div>
-          {!isReceptionist && (
-            <Button
-              onClick={() => setShowModal(true)}
-              className="w-full shrink-0 bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 hover:bg-[#BF9004] sm:w-auto"
-            >
-              <Plus className="w-4 h-4 mr-2" /> Nova Ficha
-            </Button>
-          )}
+          <Button
+            onClick={openCreateModal}
+            className="w-full shrink-0 bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 hover:bg-[#BF9004] sm:w-auto"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Nova ficha
+          </Button>
         </header>
 
         <main className="mt-8 space-y-4">
@@ -174,11 +223,9 @@ export default function TreinosPage() {
                 <Dumbbell className="w-10 h-10 text-[#F2B705]" />
               </div>
               <p className="text-white font-semibold text-lg">Nenhuma ficha cadastrada ainda</p>
-              {!isReceptionist && (
-                <p className="max-w-xs text-sm text-[#A6A6A6]">
-                  Clique em Nova Ficha para montar o primeiro treino de um aluno.
-                </p>
-              )}
+              <p className="max-w-xs text-sm text-[#A6A6A6]">
+                Clique em Nova ficha para montar o primeiro treino de um aluno.
+              </p>
             </div>
           ) : (
             fichas.map((ficha) => {
@@ -210,7 +257,18 @@ export default function TreinosPage() {
                       <span className="text-xs text-[#585759] hidden sm:block">
                         {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
                       </span>
-                      {!isReceptionist && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openEditModal(ficha)
+                        }}
+                        className="rounded-lg p-1.5 text-[#585759] transition-colors hover:bg-[#F2B705]/10 hover:text-[#F2B705]"
+                        aria-label="Editar ficha"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {isAdmin && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -218,6 +276,7 @@ export default function TreinosPage() {
                             handleDelete(ficha.id)
                           }}
                           className="rounded-lg p-1.5 text-[#585759] transition-colors hover:bg-red-500/10 hover:text-red-500"
+                          aria-label="Excluir ficha"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -248,7 +307,7 @@ export default function TreinosPage() {
                                   <td className="py-3 pr-4 text-white font-medium">{ex.nome}</td>
                                   <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.series}x</td>
                                   <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.repeticoes}</td>
-                                  <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.carga || '—'}</td>
+                                  <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.carga || 'Sem registro'}</td>
                                   <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.descanso}</td>
                                 </tr>
                               ))}
@@ -266,11 +325,13 @@ export default function TreinosPage() {
       </div>
 
       {/* Create Ficha Modal */}
-      {showModal && !isReceptionist && (
+      {showModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="my-8 w-full max-w-2xl rounded-2xl border border-[#585759] bg-[#0D0D0D] shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center sticky top-0 bg-[#0D0D0D] rounded-t-2xl z-10 text-white">
-              <h2 className="text-xl font-bold">Nova Ficha de Treino</h2>
+              <h2 className="text-xl font-bold">
+                {editingFichaId ? 'Editar ficha de treino' : 'Nova ficha de treino'}
+              </h2>
               <button onClick={() => { setShowModal(false); resetModal() }} className="text-[#A6A6A6] hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -283,7 +344,7 @@ export default function TreinosPage() {
                   <div className="space-y-2">
                     <Label className="text-[#A6A6A6]">Nome da Ficha</Label>
                     <Input value={nomeFicha} onChange={e => setNomeFicha(e.target.value)} required
-                      placeholder="Ex: Treino A — Peito e Tríceps"
+                      placeholder="Ex.: Treino A: peito e tríceps"
                       className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]" />
                   </div>
                   <div className="space-y-2">
@@ -299,7 +360,7 @@ export default function TreinosPage() {
                 <div className="space-y-2">
                   <Label className="text-[#A6A6A6]">Objetivo (opcional)</Label>
                   <Input value={objetivo} onChange={e => setObjetivo(e.target.value)}
-                    placeholder="Ex: Hipertrofia, Emagrecimento, Força..."
+                    placeholder="Ex.: hipertrofia, emagrecimento, força..."
                     className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]" />
                 </div>
 
@@ -336,7 +397,7 @@ export default function TreinosPage() {
                           </div>
                           <div className="space-y-1">
                             <Label className="text-[#585759] text-xs">Reps</Label>
-                            <Input value={ex.repeticoes} onChange={e => updateExercicio(i, 'repeticoes', e.target.value)} placeholder="10-12"
+                            <Input value={ex.repeticoes} onChange={e => updateExercicio(i, 'repeticoes', e.target.value)} placeholder="10 a 12"
                               className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-9 text-sm" />
                           </div>
                           <div className="space-y-1">

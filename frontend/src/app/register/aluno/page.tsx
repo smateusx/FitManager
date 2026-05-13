@@ -104,7 +104,7 @@ function RegisterAlunoForm() {
           </CardHeader>
           <CardContent className="space-y-4 pb-6">
             <p className="text-center text-sm text-[#A6A6A6]">
-              Abra o link que enviamos para você. Depois faça login — pedimos o CPF na sequência.
+              Abra o link que enviamos para você. Depois faça login; pedimos o CPF na sequência.
             </p>
             <Button
               type="button"
@@ -224,7 +224,7 @@ function RegisterAlunoForm() {
         </CardContent>
         <CardFooter className="border-t border-[#585759]/30 pt-4">
           <Link href="/login/aluno" className="w-full text-center text-sm text-[#585759] hover:text-[#F2B705]">
-            Já tenho conta — entrar
+            Já tenho conta: entrar
           </Link>
         </CardFooter>
       </Card>
