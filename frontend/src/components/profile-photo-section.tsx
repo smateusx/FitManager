@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { ref, uploadBytesResumable, getDownloadURL, type UploadTask } from 'firebase/storage'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { updateProfile } from 'firebase/auth'
 import { getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase'
 import { setPerfil } from '@/lib/firestore'
@@ -10,38 +10,43 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 
 const MAX_BYTES = 2 * 1024 * 1024
-const UPLOAD_TIMEOUT_MS = 90_000
+const UPLOAD_MS = 120_000
+const URL_MS = 45_000
+const FIRESTORE_MS = 45_000
 
-function runUploadTask(task: UploadTask, timeoutMs: number): Promise<void> {
+function readErrorCode(err: unknown): string {
+  if (err && typeof err === 'object' && 'code' in err && typeof (err as { code: string }).code === 'string') {
+    return (err as { code: string }).code
+  }
+  return ''
+}
+
+function withDeadline<T>(promise: Promise<T>, ms: number, code: string): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      task.cancel()
-    }, timeoutMs)
-    task.on(
-      'state_changed',
-      () => {},
-      (err) => {
-        clearTimeout(timer)
-        reject(err)
+    const t = setTimeout(() => reject(Object.assign(new Error(code), { code })), ms)
+    promise.then(
+      (v) => {
+        clearTimeout(t)
+        resolve(v)
       },
-      () => {
-        clearTimeout(timer)
-        resolve()
+      (e) => {
+        clearTimeout(t)
+        reject(e)
       }
     )
   })
 }
 
-function storageOrNetworkMessage(err: unknown): string {
-  const code =
-    err && typeof err === 'object' && 'code' in err && typeof (err as { code: string }).code === 'string'
-      ? (err as { code: string }).code
-      : ''
+function uploadErrorMessage(err: unknown): string {
+  const code = readErrorCode(err)
+  if (code === 'deadline-exceeded') {
+    return 'A operação demorou demais (rede lenta ou Firebase sem resposta). Tente outra rede ou uma foto menor.'
+  }
   if (code === 'storage/unauthorized') {
     return 'Sem permissão no Storage. Publique firebase/storage.rules e confirme que está logado.'
   }
   if (code === 'storage/canceled') {
-    return 'Envio cancelado ou tempo esgotado. Verifique a conexão ou use uma imagem menor.'
+    return 'Envio cancelado. Verifique a conexão ou tente de novo.'
   }
   if (code === 'storage/retry-limit-exceeded' || code === 'storage/unknown') {
     return 'Falha de rede ao enviar. Tente de novo em instantes.'
@@ -49,7 +54,13 @@ function storageOrNetworkMessage(err: unknown): string {
   if (code === 'storage/quota-exceeded') {
     return 'Limite de armazenamento do projeto atingido no Firebase.'
   }
-  return 'Não foi possível enviar a foto. Confira se o Firebase Storage está ativo, se NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET no Vercel é o bucket correto (ex.: projeto.firebasestorage.app) e se as regras foram publicadas.'
+  return 'Não foi possível enviar a foto. Confira se o Firebase Storage está ativo, se NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET no Vercel coincide com o bucket do Console e se as regras foram publicadas.'
+}
+
+function isHeic(file: File): boolean {
+  const t = file.type.toLowerCase()
+  if (t === 'image/heic' || t === 'image/heif') return true
+  return /\.hei[cf]$/i.test(file.name)
 }
 
 type Props = {
@@ -67,6 +78,13 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+
+    if (isHeic(file)) {
+      alert(
+        'Fotos HEIC (iPhone) não funcionam bem no navegador. Use JPG: Ajustes → Câmera → Formatos → «Mais compatível», ou escolha «Mais recentes» e exporte como JPEG.'
+      )
+      return
+    }
     if (!file.type.startsWith('image/')) {
       alert('Escolha uma imagem (JPG, PNG ou WebP).')
       return
@@ -75,6 +93,7 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
       alert('Use uma imagem de até 2 MB.')
       return
     }
+
     const auth = getFirebaseAuth()
     const u = auth.currentUser
     if (!u || u.uid !== userId) {
@@ -90,11 +109,12 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
 
       const storage = getFirebaseStorage()
       const pathRef = ref(storage, `avatars/${u.uid}/profile.${ext}`)
-      const task = uploadBytesResumable(pathRef, file, { contentType })
-      await runUploadTask(task, UPLOAD_TIMEOUT_MS)
 
-      const url = await getDownloadURL(pathRef)
-      await setPerfil(u.uid, { foto_url: url })
+      await withDeadline(uploadBytes(pathRef, file, { contentType }), UPLOAD_MS, 'deadline-exceeded')
+
+      const url = await withDeadline(getDownloadURL(pathRef), URL_MS, 'deadline-exceeded')
+
+      await withDeadline(setPerfil(u.uid, { foto_url: url }), FIRESTORE_MS, 'deadline-exceeded')
       onChange(url)
 
       try {
@@ -104,7 +124,7 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
       }
     } catch (err) {
       console.error(err)
-      alert(storageOrNetworkMessage(err))
+      alert(uploadErrorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -119,7 +139,7 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
         alert('Sessão inválida. Saia e entre novamente.')
         return
       }
-      await setPerfil(u.uid, { foto_url: null })
+      await withDeadline(setPerfil(u.uid, { foto_url: null }), FIRESTORE_MS, 'deadline-exceeded')
       onChange(null)
       try {
         await updateProfile(u, { photoURL: null })
@@ -180,7 +200,7 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
           </Button>
         ) : null}
       </div>
-      <p className="max-w-[14rem] text-center text-xs text-[#585759]">JPG, PNG ou WebP · até 2 MB</p>
+      <p className="max-w-[14rem] text-center text-xs text-[#585759]">JPG, PNG ou WebP · até 2 MB · no iPhone prefira «Mais compatível»</p>
     </div>
   )
 }
