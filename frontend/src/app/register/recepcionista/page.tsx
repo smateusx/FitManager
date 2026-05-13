@@ -14,9 +14,9 @@ import {
 } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { seedRecepcionistaInviteProfile } from '@/lib/firestore'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
-import { CheckCircle2, Mail } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 
 function RegisterRecepcionistaForm() {
   const [fullName, setFullName] = useState('')
@@ -95,22 +95,25 @@ function RegisterRecepcionistaForm() {
   if (success) {
     return (
       <AuthShell>
-        <Card className="w-full border-emerald-500/25 bg-[#0D0D0D]/85 backdrop-blur-xl text-center shadow-2xl">
-          <CardContent className="space-y-5 pt-10 pb-8">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
-              <CheckCircle2 className="h-9 w-9 text-emerald-400" />
+        <Card className="w-full border border-emerald-500/30 bg-[#0D0D0D]/90 shadow-xl backdrop-blur-xl">
+          <CardHeader className="space-y-3 pb-3 text-center">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+              <CheckCircle2 className="h-5 w-5" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Quase lá</h1>
-            <p className="mx-auto flex max-w-sm items-start gap-2 text-sm text-[#A6A6A6]">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-[#F2B705]" />
-              Confirme o link que enviamos para seu e-mail. Depois faça login — vamos pedir seu CPF na próxima tela.
+            <CardTitle className="text-xl font-semibold text-white">Confirme o e-mail</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 pb-6">
+            <p className="text-center text-sm text-[#A6A6A6]">
+              Abra o link que enviamos para você. Depois faça login — pedimos o CPF na sequência.
             </p>
             <Button
+              type="button"
               onClick={() => router.push('/login')}
-              className="bg-[#F2B705] font-bold text-[#0D0D0D] hover:bg-[#BF9004]"
+              className="h-11 w-full bg-[#F2B705] font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
             >
               Ir para o login
             </Button>
+            <p className="text-center text-[11px] text-[#585759]">Confira também spam e promoções.</p>
           </CardContent>
         </Card>
       </AuthShell>
@@ -119,14 +122,12 @@ function RegisterRecepcionistaForm() {
 
   return (
     <AuthShell>
-      <Card className="w-full border-[#585759] bg-[#0D0D0D]/85 backdrop-blur-xl shadow-2xl">
-        <CardHeader className="space-y-2 pb-6 text-center sm:text-left">
-          <CardTitle className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Convite — receção
-          </CardTitle>
-          <CardDescription className="text-[#A6A6A6]">
-            Cadastro para equipe da receção: alunos, fichas e planos, sem acesso de administrador.
-          </CardDescription>
+      <Card className="w-full border border-[#585759]/35 bg-[#0D0D0D]/90 shadow-xl backdrop-blur-xl">
+        <CardHeader className="space-y-3 pb-4 text-center">
+          <CardTitle className="text-xl font-semibold tracking-tight text-white">Receção</CardTitle>
+          <p className="text-sm text-[#585759]">
+            Convite da academia: alunos, fichas e planos, sem painel de administrador.
+          </p>
         </CardHeader>
         <CardContent>
           {!academiaId && (
@@ -140,8 +141,8 @@ function RegisterRecepcionistaForm() {
             </div>
           )}
           <form onSubmit={handleRegister} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[#A6A6A6]">
+            <div className="space-y-1.5">
+              <Label htmlFor="fullName" className="text-xs text-[#A6A6A6]">
                 Nome completo
               </Label>
               <Input
@@ -153,8 +154,8 @@ function RegisterRecepcionistaForm() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-[#A6A6A6]">
+            <div className="space-y-1.5">
+              <Label htmlFor="phone" className="text-xs text-[#A6A6A6]">
                 Telefone / WhatsApp (opcional)
               </Label>
               <Input
@@ -165,8 +166,8 @@ function RegisterRecepcionistaForm() {
                 onChange={(e) => setPhone(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-[#A6A6A6]">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs text-[#A6A6A6]">
                 E-mail
               </Label>
               <Input
@@ -181,8 +182,8 @@ function RegisterRecepcionistaForm() {
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-[#A6A6A6]">
+              <div className="space-y-1.5">
+                <Label htmlFor="password" className="text-xs text-[#A6A6A6]">
                   Senha (mín. 6)
                 </Label>
                 <Input
@@ -197,8 +198,8 @@ function RegisterRecepcionistaForm() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="passwordConfirm" className="text-[#A6A6A6]">
+              <div className="space-y-1.5">
+                <Label htmlFor="passwordConfirm" className="text-xs text-[#A6A6A6]">
                   Confirmar senha
                 </Label>
                 <Input
@@ -216,15 +217,15 @@ function RegisterRecepcionistaForm() {
             </div>
             <Button
               type="submit"
-              className="mt-2 h-11 w-full bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 transition-all hover:bg-[#BF9004]"
+              className="mt-1 h-11 w-full bg-[#F2B705] font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
               disabled={loading || !academiaId}
             >
-              {loading ? 'Criando conta...' : 'Criar conta'}
+              {loading ? 'Criando…' : 'Criar conta'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="border-t border-[#585759]/50 pt-4">
-          <Link href="/login" className="w-full text-center text-sm text-[#A6A6A6] hover:text-[#F2B705]">
+        <CardFooter className="border-t border-[#585759]/30 pt-4">
+          <Link href="/login" className="w-full text-center text-sm text-[#585759] hover:text-[#F2B705]">
             Já tenho conta — entrar
           </Link>
         </CardFooter>
