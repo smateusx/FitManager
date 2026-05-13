@@ -2,15 +2,19 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+type PdfDocWithPages = jsPDF & {
+  internal: { getNumberOfPages: () => number }
+}
+
 export class ReportsService {
   /**
    * Exporta dados para um arquivo Excel (.xlsx)
    */
-  static exportToExcel(data: any[], fileName: string) {
+  static exportToExcel(data: Record<string, unknown>[], fileName: string) {
     const worksheet = XLSX.utils.json_to_sheet(data)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório')
-    
+
     // Gerar o arquivo e disparar o download
     XLSX.writeFile(workbook, `${fileName}.xlsx`)
   }
@@ -18,14 +22,19 @@ export class ReportsService {
   /**
    * Exporta dados para um PDF formatado
    */
-  static exportToPDF(columns: string[], rows: any[][], title: string, fileName: string) {
+  static exportToPDF(
+    columns: string[],
+    rows: (string | number | null | undefined)[][],
+    title: string,
+    fileName: string
+  ) {
     const doc = new jsPDF()
 
     // Configurações do Cabeçalho
     doc.setFontSize(20)
     doc.setTextColor(13, 13, 13) // Dark color
     doc.text('FITMANAGER', 14, 20)
-    
+
     doc.setFontSize(10)
     doc.setTextColor(166, 166, 166) // Soft gray
     doc.text(`Relatório Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, 28)
@@ -43,25 +52,25 @@ export class ReportsService {
     autoTable(doc, {
       startY: 50,
       head: [columns],
-      body: rows,
+      body: rows as string[][],
       theme: 'striped',
       headStyles: {
         fillColor: [13, 13, 13], // Dark bg
         textColor: [255, 255, 255],
         fontSize: 10,
-        fontStyle: 'bold'
+        fontStyle: 'bold',
       },
       styles: {
         fontSize: 9,
-        cellPadding: 3
+        cellPadding: 3,
       },
       alternateRowStyles: {
-        fillColor: [245, 245, 245]
-      }
+        fillColor: [245, 245, 245],
+      },
     })
 
     // Rodapé
-    const pageCount = (doc as any).internal.getNumberOfPages()
+    const pageCount = (doc as PdfDocWithPages).internal.getNumberOfPages()
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i)
       doc.setFontSize(8)

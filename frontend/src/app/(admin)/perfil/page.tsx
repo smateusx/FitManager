@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { updatePassword, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
+import { ProfilePhotoSection } from '@/components/profile-photo-section'
 import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/components/password-session-after-change'
-import { userInitials } from '@/lib/user-initials'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,6 +25,7 @@ export default function PerfilPage() {
 
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordSessionMode, setPasswordSessionMode] = useState<PasswordSessionMode>('stay')
@@ -58,6 +59,7 @@ export default function PerfilPage() {
         setPerfil(data)
         setNome(data.nome_completo || '')
         setTelefone(data.telefone || '')
+        setFotoUrl(data.foto_url ?? null)
       } catch (err) {
         console.error('Erro ao carregar perfil:', err)
       } finally {
@@ -133,14 +135,14 @@ export default function PerfilPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0D0D0D]">
+      <div className="flex min-h-[50vh] items-center justify-center bg-[#0D0D0D] py-16">
         <Loader2 className="w-8 h-8 text-[#F2B705] animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="min-h-0 p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
         <header className="pb-8 border-b border-[#585759]/30 mb-8">
           <h1 className="text-3xl font-bold text-[#F2B705]">Configurações de Perfil</h1>
@@ -156,17 +158,16 @@ export default function PerfilPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-            <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-3xl p-8 shadow-2xl lg:sticky lg:top-8">
+            <div className="rounded-3xl border border-[#585759]/30 bg-[#0D0D0D] p-6 shadow-2xl sm:p-8">
               <div className="flex flex-col items-center text-center">
-                <div
-                  className="w-24 h-24 rounded-full bg-[#F2B705]/15 border-2 border-[#F2B705]/40 flex items-center justify-center text-2xl font-black text-[#F2B705]"
-                  aria-hidden
-                >
-                  {userInitials(nome || perfil?.nome_completo)}
-                </div>
-                <p className="mt-4 text-xs text-[#A6A6A6] max-w-[14rem]">
-                  Perfil sem upload de imagens — apenas iniciais, para manter o sistema simples.
-                </p>
+                {userId ? (
+                  <ProfilePhotoSection
+                    userId={userId}
+                    displayName={nome || perfil?.nome_completo || '?'}
+                    fotoUrl={fotoUrl}
+                    onChange={setFotoUrl}
+                  />
+                ) : null}
               </div>
 
               <div className="mt-8 space-y-4">

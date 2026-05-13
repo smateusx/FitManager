@@ -53,6 +53,7 @@ export async function getPerfil(userId: string) {
     nome_completo: d.nome_completo ?? null,
     telefone: d.telefone ?? null,
     cpf: (d.cpf as string | undefined) ?? null,
+    foto_url: (d.foto_url as string | undefined) ?? null,
     created_at: tsToIso(d.created_at),
   }
 }
@@ -65,6 +66,7 @@ export async function setPerfil(
     nome_completo: string | null
     telefone: string | null
     cpf: string | null
+    foto_url: string | null
   }>
 ) {
   await setDoc(
@@ -86,6 +88,28 @@ export async function seedAlunoInviteProfile(params: {
     doc(getDb(), 'perfis', userId),
     {
       role: 'ALUNO',
+      academia_id,
+      nome_completo: nome_completo ?? null,
+      telefone: telefone ?? null,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    },
+    { merge: true }
+  )
+}
+
+/** Mesmo padrão do convite de aluno: papel já fixo na academia antes do CPF. */
+export async function seedRecepcionistaInviteProfile(params: {
+  userId: string
+  academia_id: string
+  nome_completo?: string | null
+  telefone?: string | null
+}): Promise<void> {
+  const { userId, academia_id, nome_completo, telefone } = params
+  await setDoc(
+    doc(getDb(), 'perfis', userId),
+    {
+      role: 'RECEPCIONISTA',
       academia_id,
       nome_completo: nome_completo ?? null,
       telefone: telefone ?? null,

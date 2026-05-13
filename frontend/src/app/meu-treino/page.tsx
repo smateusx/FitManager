@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
@@ -24,7 +25,7 @@ import {
 } from 'lucide-react'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
-import { userInitials } from '@/lib/user-initials'
+import { ProfileAvatar } from '@/components/profile-avatar'
 
 type Exercicio = {
   id: string
@@ -55,6 +56,7 @@ export default function MeuTreinoPage() {
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
   const [matriculas, setMatriculas] = useState<
     Awaited<ReturnType<typeof listMatriculasByAluno>>
@@ -85,6 +87,7 @@ export default function MeuTreinoPage() {
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserId(u.uid)
+        setUserPhotoUrl(perfil.foto_url ?? null)
       }
 
       const fichasData = await listFichasByAluno(u.uid)
@@ -131,38 +134,40 @@ export default function MeuTreinoPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0D0D0D]">
-        <div className="w-8 h-8 border-4 border-[#F2B705] border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex min-h-[50vh] items-center justify-center bg-[#0D0D0D] py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#F2B705] border-t-transparent"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white">
+    <div className="min-h-0 bg-[#0D0D0D] text-white">
       {/* Glossy Header Background */}
       <div className="fixed top-0 inset-x-0 h-40 bg-gradient-to-b from-[#F2B705]/5 to-transparent pointer-events-none" />
 
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-[#0D0D0D]/80 backdrop-blur-md border-b border-[#585759]/20">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#F2B705] rounded-lg flex items-center justify-center">
-              <Dumbbell className="w-5 h-5 text-[#0D0D0D]" />
+        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
+          <Link
+            href="/"
+            className="flex items-center gap-2 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F2B705]"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F2B705]">
+              <Dumbbell className="h-5 w-5 text-[#0D0D0D]" />
             </div>
-            <span className="font-black text-xl tracking-tighter uppercase">FitManager</span>
-          </div>
+            <span className="text-xl font-black uppercase tracking-tighter">FitManager</span>
+          </Link>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button 
               onClick={() => router.push('/meu-perfil')}
-              className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-xl hover:bg-[#585759]/20 transition-all border border-transparent hover:border-[#585759]/30 group min-w-0"
+              className="group flex min-w-0 items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 transition-all hover:border-[#585759]/30 hover:bg-[#585759]/20 sm:gap-3 sm:px-3"
             >
-              <div
-                className="w-8 h-8 rounded-full bg-[#F2B705]/15 border border-[#F2B705]/35 flex items-center justify-center text-[10px] font-bold text-[#F2B705] shrink-0"
-                aria-hidden
-              >
-                {userInitials(userName)}
-              </div>
+              <ProfileAvatar
+                fotoUrl={userPhotoUrl}
+                name={userName}
+                sizeClass="h-8 w-8 text-[10px] border border-[#F2B705]/35"
+              />
               <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white truncate hidden sm:inline max-w-[8rem]">
                 {userName.split(' ')[0]}
               </span>
@@ -179,7 +184,7 @@ export default function MeuTreinoPage() {
         </div>
       </nav>
 
-      <main className="max-w-4xl mx-auto px-6 py-10 relative z-10">
+      <main className="relative z-10 mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
         {/* Greeting */}
         <div className="mb-8">
           <p className="text-[#A6A6A6] text-sm uppercase tracking-widest font-semibold mb-1">Portal do Aluno</p>

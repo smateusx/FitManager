@@ -12,7 +12,7 @@ fi
 : "${FIREBASE_TOKEN:?Defina FIREBASE_TOKEN}"
 : "${FIREBASE_PROJECT_ID:?Defina FIREBASE_PROJECT_ID}"
 exec npx --yes firebase-tools@latest deploy \
-  --only firestore \
+  --only firestore,storage \
   --project "$FIREBASE_PROJECT_ID" \
   --token "$FIREBASE_TOKEN" \
   --non-interactive

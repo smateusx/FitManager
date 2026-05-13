@@ -14,6 +14,7 @@ export interface UserProfile {
   nome_completo: string | null
   telefone: string | null
   cpf: string | null
+  foto_url: string | null
 }
 
 export function useAuth() {
@@ -41,6 +42,7 @@ export function useAuth() {
                 nome_completo: p.nome_completo,
                 telefone: p.telefone ?? null,
                 cpf: p.cpf ?? null,
+                foto_url: p.foto_url ?? null,
               }
             : null
         )

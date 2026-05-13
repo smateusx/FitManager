@@ -15,19 +15,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EvolutionChart } from '@/components/evolution-chart'
-import { 
-  User as UserIcon, 
-  Dumbbell, 
-  CreditCard, 
-  ChevronLeft, 
-  Phone, 
-  Mail, 
+import {
+  User as UserIcon,
+  Dumbbell,
+  CreditCard,
   Calendar,
-  Clock,
-  AlertCircle,
+  ChevronLeft,
   Plus,
   X,
-  Trash2
+  Trash2,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -58,6 +54,15 @@ type Matricula = {
   planos: { nome: string; valor: number } | null
 }
 
+type PlanoRow = {
+  id: string
+  nome: string
+  valor: number
+  duracao_dias?: number
+}
+
+type DetailTab = 'perfil' | 'treinos' | 'financeiro' | 'evolucao'
+
 type AlunoDetail = {
   id: string
   nome_completo: string | null
@@ -75,8 +80,8 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'perfil' | 'treinos' | 'financeiro' | 'evolucao'>('perfil')
-  const [planos, setPlanos] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<DetailTab>('perfil')
+  const [planos, setPlanos] = useState<PlanoRow[]>([])
   
   // Renewal modal states
   const [showRenewModal, setShowRenewModal] = useState(false)
@@ -85,52 +90,59 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [renewValor, setRenewValor] = useState('')
   const [isRenewing, setIsRenewing] = useState(false)
   
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isAdmin } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (authLoading) return
 
-    const fetchData = async () => {
-      setLoading(true)
-      const u = getFirebaseAuth().currentUser
-      if (!u) {
-        router.push('/login')
-        return
-      }
+    let cancelled = false
+    queueMicrotask(() => {
+      void (async () => {
+        setLoading(true)
+        const u = getFirebaseAuth().currentUser
+        if (!u) {
+          router.push('/login')
+          return
+        }
 
-      const alunoData = await getAlunoComAcademia(alunoId)
-      if (!alunoData) {
-        router.push('/alunos')
-        return
-      }
+        const alunoData = await getAlunoComAcademia(alunoId)
+        if (!alunoData) {
+          router.push('/alunos')
+          return
+        }
 
-      setAluno({
-        id: alunoData.id,
-        nome_completo: (alunoData as Record<string, unknown>).nome_completo as string | null,
-        telefone: (alunoData as Record<string, unknown>).telefone as string | null,
-        role: (alunoData as Record<string, unknown>).role as string,
-        created_at: ((alunoData as Record<string, unknown>).created_at as string) || new Date().toISOString(),
-        academia_id: (alunoData as Record<string, unknown>).academia_id as string,
-      })
+        if (cancelled) return
 
-      const fichasData = await listFichasByAluno(alunoId)
-      setFichas((fichasData as Ficha[]) ?? [])
+        setAluno({
+          id: alunoData.id,
+          nome_completo: (alunoData as Record<string, unknown>).nome_completo as string | null,
+          telefone: (alunoData as Record<string, unknown>).telefone as string | null,
+          role: (alunoData as Record<string, unknown>).role as string,
+          created_at: ((alunoData as Record<string, unknown>).created_at as string) || new Date().toISOString(),
+          academia_id: (alunoData as Record<string, unknown>).academia_id as string,
+        })
 
-      const matriculasData = await listMatriculasByAluno(alunoId)
-      setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
+        const fichasData = await listFichasByAluno(alunoId)
+        setFichas((fichasData as Ficha[]) ?? [])
 
-      const admin = await getPerfil(u.uid)
-      if (admin?.academia_id) {
-        const planosData = await listPlanos(admin.academia_id, true)
-        setPlanos(planosData || [])
-      }
+        const matriculasData = await listMatriculasByAluno(alunoId)
+        setMatriculas((matriculasData as unknown as Matricula[]) ?? [])
 
-      setLoading(false)
+        const admin = await getPerfil(u.uid)
+        if (admin?.academia_id) {
+          const planosData = await listPlanos(admin.academia_id, true)
+          setPlanos((planosData as PlanoRow[]) || [])
+        }
+
+        if (!cancelled) setLoading(false)
+      })()
+    })
+
+    return () => {
+      cancelled = true
     }
-
-    fetchData()
-  }, [alunoId, router])
+  }, [alunoId, router, authLoading])
 
   const handleRenewMatricula = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -138,7 +150,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
     setIsRenewing(true)
 
     try {
-      const plano = planos.find(p => p.id === selectedPlanoId)
+      const plano = planos.find((p) => p.id === selectedPlanoId)
       const dataInicio = new Date(renewDate)
       const dataVencimento = new Date(dataInicio)
       dataVencimento.setDate(dataVencimento.getDate() + (plano?.duracao_dias || 30))
@@ -149,7 +161,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         plano_id: selectedPlanoId,
         data_inicio: renewDate,
         data_vencimento: dataVencimento.toISOString().split('T')[0],
-        valor_pago: parseFloat(renewValor) || (plano?.valor as number),
+        valor_pago: parseFloat(renewValor) || plano?.valor || 0,
         status: 'ATIVO',
       })
 
@@ -181,8 +193,8 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
   if (loading || authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D]">
-        <div className="w-10 h-10 border-4 border-[#585759] border-t-[#F2B705] rounded-full animate-spin" />
+      <div className="flex min-h-[50vh] items-center justify-center bg-[#0D0D0D] py-16">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#585759] border-t-[#F2B705]" />
       </div>
     )
   }
@@ -191,8 +203,8 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const statusMatricula = matriculaAtiva ? 'ATIVO' : (matriculas[0]?.status || 'SEM MATRÍCULA')
 
   return (
-    <div className="p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-0 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-5xl">
         {/* Breadcrumb / Back */}
         <button 
           onClick={() => router.push('/alunos')}
@@ -203,14 +215,14 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         </button>
 
         {/* Profile Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-[#585759]/30">
-          <div className="flex items-center gap-5">
-            <div className="w-20 h-20 bg-[#F2B705]/10 rounded-2xl flex items-center justify-center border border-[#F2B705]/20 shadow-lg shadow-[#F2B705]/5">
-              <UserIcon className="w-10 h-10 text-[#F2B705]" />
+        <header className="flex flex-col gap-6 border-b border-[#585759]/30 pb-6 sm:flex-row sm:items-start sm:justify-between sm:pb-8 md:items-center">
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-[#F2B705]/20 bg-[#F2B705]/10 shadow-lg shadow-[#F2B705]/5">
+              <UserIcon className="h-10 w-10 text-[#F2B705]" />
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">{aluno?.nome_completo || 'Sem Nome'}</h1>
-              <div className="flex items-center gap-3 mt-1 text-sm">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">{aluno?.nome_completo || 'Sem Nome'}</h1>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                 <span className={`px-2 py-0.5 rounded-full font-semibold ${
                   statusMatricula === 'ATIVO' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                 }`}>
@@ -221,7 +233,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex shrink-0 flex-wrap gap-2 sm:gap-3">
             {isAdmin && (
               <Button 
                 variant="outline"
@@ -252,17 +264,27 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
         </header>
 
         {/* Tabs */}
-        <div className="flex gap-1 mt-8 mb-6 border-b border-[#585759]/30">
+        <div className="-mx-1 mb-6 mt-6 flex gap-1 overflow-x-auto border-b border-[#585759]/30 px-1">
           {[
-            { id: 'perfil', label: 'Visão Geral', icon: <UserIcon className="w-4 h-4" /> },
-            { id: 'treinos', label: 'Treinos', icon: <Dumbbell className="w-4 h-4" /> },
-            { id: 'evolucao', label: 'Evolução', icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg> },
-            { id: 'financeiro', label: 'Financeiro', icon: <CreditCard className="w-4 h-4" /> }
-          ].map(t => (
-            <button 
-              key={t.id} 
-              onClick={() => setActiveTab(t.id as any)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all -mb-px ${
+            { id: 'perfil' as const, label: 'Visão Geral', icon: <UserIcon className="h-4 w-4 shrink-0" /> },
+            { id: 'treinos' as const, label: 'Treinos', icon: <Dumbbell className="h-4 w-4 shrink-0" /> },
+            {
+              id: 'evolucao' as const,
+              label: 'Evolução',
+              icon: (
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 3v18h18" />
+                  <path d="m19 9-5 5-4-4-3 3" />
+                </svg>
+              ),
+            },
+            { id: 'financeiro' as const, label: 'Financeiro', icon: <CreditCard className="h-4 w-4 shrink-0" /> },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setActiveTab(t.id)}
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap px-4 py-3 text-sm font-medium transition-all sm:px-5 ${
                 activeTab === t.id 
                   ? 'text-[#F2B705] border-b-2 border-[#F2B705]' 
                   : 'text-[#A6A6A6] hover:text-white'
@@ -446,21 +468,22 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-white font-bold text-lg">Histórico de Pagamentos</h2>
-                    <Button 
+                  <div className="-mx-1 mb-4 flex flex-col gap-3 sm:mx-0 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-lg font-bold text-white">Histórico de Pagamentos</h2>
+                    <Button
+                      type="button"
                       onClick={() => {
                         const latestVenc = matriculas[0]?.data_vencimento || new Date().toISOString().split('T')[0]
                         setRenewDate(latestVenc)
                         setShowRenewModal(true)
                       }}
-                      className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20"
+                      className="w-full shrink-0 bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 hover:bg-[#BF9004] sm:w-auto"
                     >
                       <Plus className="w-4 h-4 mr-2" /> Renovar Matrícula
                     </Button>
                   </div>
-                  <div className="border border-[#585759]/50 rounded-xl overflow-hidden shadow-xl">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto rounded-xl border border-[#585759]/50 shadow-xl">
+                  <table className="min-w-[560px] w-full text-sm">
                     <thead className="bg-[#585759]/10 text-[#585759] uppercase text-xs tracking-wider text-left">
                       <tr>
                         <th className="p-4 text-left">Plano</th>
@@ -500,7 +523,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       {/* Modal de Renovação Rápida */}
       {showRenewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#0D0D0D] border border-[#585759] rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#585759] bg-[#0D0D0D] shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center text-white">
               <h2 className="text-xl font-bold">Renovar Matrícula</h2>
               <button onClick={() => setShowRenewModal(false)} className="text-[#A6A6A6] hover:text-white">
@@ -527,7 +550,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                 </select>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-xs text-[#A6A6A6] uppercase font-bold tracking-wider">Data de Início</label>
                   <input 

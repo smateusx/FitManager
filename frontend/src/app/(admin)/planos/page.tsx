@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getFirebaseAuth } from '@/lib/firebase'
 import {
@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, X, CreditCard, Users, TrendingUp, AlertCircle } from 'lucide-react'
+import { Plus, X, Users, TrendingUp, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 
 type Plano = {
@@ -48,7 +48,7 @@ const STATUS_COLORS = {
 }
 
 export default function PlanosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [tab, setTab] = useState<'matriculas' | 'planos'>('matriculas')
   const [planos, setPlanos] = useState<Plano[]>([])
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
@@ -73,12 +73,7 @@ export default function PlanosPage() {
 
   const router = useRouter()
 
-  useEffect(() => {
-    if (authLoading) return
-    fetchAll()
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     const u = getFirebaseAuth().currentUser
     if (!u) {
@@ -106,7 +101,14 @@ export default function PlanosPage() {
     setMatriculas(matriculasData as unknown as Matricula[])
     setAlunos(alunosData)
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAll()
+    })
+  }, [authLoading, fetchAll])
 
   const calcVencimento = (planoId: string, inicio: string) => {
     const plano = planos.find((p) => p.id === planoId)
@@ -171,14 +173,16 @@ export default function PlanosPage() {
   const receitaMes = matriculas.filter((m) => m.status === 'ATIVO').reduce((sum, m) => sum + (m.valor_pago ?? 0), 0)
 
   return (
-    <div className="p-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="flex items-center justify-between pb-8 border-b border-[#585759]/30">
-          <div>
-            <h1 className="text-3xl font-bold text-[#F2B705]">Planos & Pagamentos</h1>
-            <p className="text-[#A6A6A6] mt-1">Gerencie matrículas e controle financeiro da academia.</p>
+    <div className="min-h-0 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl">
+        <header className="flex flex-col gap-4 border-b border-[#585759]/30 pb-6 sm:flex-row sm:items-end sm:justify-between sm:pb-8">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-[#F2B705] sm:text-3xl">Planos & Pagamentos</h1>
+            <p className="mt-1 text-sm text-[#A6A6A6] sm:text-base">
+              Gerencie matrículas e controle financeiro da academia.
+            </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {!isReceptionist && (
               <Button
                 onClick={() => setShowPlanoModal(true)}
@@ -235,11 +239,11 @@ export default function PlanosPage() {
           </div>
         )}
 
-        <div className="flex gap-2 mt-8 border-b border-[#585759]/30">
+        <div className="-mx-1 mt-6 flex gap-1 overflow-x-auto border-b border-[#585759]/30 px-1 pb-px sm:mt-8">
           <button
             type="button"
             onClick={() => setTab('matriculas')}
-            className={`px-4 py-2 font-semibold border-b-2 -mb-px ${
+            className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm font-semibold border-b-2 -mb-px sm:px-4 sm:text-base ${
               tab === 'matriculas' ? 'border-[#F2B705] text-[#F2B705]' : 'border-transparent text-[#A6A6A6]'
             }`}
           >
@@ -248,7 +252,7 @@ export default function PlanosPage() {
           <button
             type="button"
             onClick={() => setTab('planos')}
-            className={`px-4 py-2 font-semibold border-b-2 -mb-px ${
+            className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm font-semibold border-b-2 -mb-px sm:px-4 sm:text-base ${
               tab === 'planos' ? 'border-[#F2B705] text-[#F2B705]' : 'border-transparent text-[#A6A6A6]'
             }`}
           >
@@ -310,7 +314,7 @@ export default function PlanosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <form
             onSubmit={handleSavePlano}
-            className="bg-[#0D0D0D] border border-[#585759] rounded-xl p-6 max-w-md w-full space-y-4"
+            className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl border border-[#585759] bg-[#0D0D0D] p-6"
           >
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">Novo plano</h2>
@@ -360,7 +364,7 @@ export default function PlanosPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <form
             onSubmit={handleSaveMatricula}
-            className="bg-[#0D0D0D] border border-[#585759] rounded-xl p-6 max-w-md w-full space-y-4"
+            className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl border border-[#585759] bg-[#0D0D0D] p-6"
           >
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-bold text-white">Nova matrícula</h2>
