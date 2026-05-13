@@ -9,16 +9,15 @@ import {
   matriculasRecentes,
   matriculasTodas,
 } from '@/lib/firestore'
-import { Users, Dumbbell, UserCheck, AlertTriangle, TrendingUp, CreditCard, Clock, FileDown, FileSpreadsheet } from 'lucide-react'
+import { FileDown, FileSpreadsheet } from 'lucide-react'
 import { RevenueChart } from '@/components/revenue-chart'
 import { ReportsService } from '@/lib/reports-service'
 import { useAuth } from '@/hooks/use-auth'
+import { Button } from '@/components/ui/button'
 
 type Stats = {
   totalAlunos: number
-  alunosAtivos: number
   totalTreinos: number
-  semTreino: number
   receitaMensal: number
   vencimentosMes: number
 }
@@ -31,16 +30,19 @@ type RecentActivity = {
   data: string
 }
 
+type MatriculaMesRow = {
+  status?: string
+  valor_pago?: unknown
+}
+
 export default function DashboardPage() {
   const { profile, loading: authLoading, isReceptionist } = useAuth()
   const academiaId = profile?.academia_id
-  const [stats, setStats] = useState<Stats>({ 
-    totalAlunos: 0, 
-    alunosAtivos: 0, 
-    totalTreinos: 0, 
-    semTreino: 0,
+  const [stats, setStats] = useState<Stats>({
+    totalAlunos: 0,
+    totalTreinos: 0,
     receitaMensal: 0,
-    vencimentosMes: 0
+    vencimentosMes: 0,
   })
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
@@ -62,28 +64,30 @@ export default function DashboardPage() {
 
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const matriculasMes = await matriculasCriadasDesde(academiaId, startOfMonth)
+        const matriculasMes = (await matriculasCriadasDesde(academiaId, startOfMonth)) as MatriculaMesRow[]
 
-        const receita = (matriculasMes || [])
-          .filter((m: any) => m.status === 'ATIVO' && m.valor_pago)
-          .reduce((sum, m: any) => sum + Number(m.valor_pago), 0)
+        const receita = matriculasMes
+          .filter((m) => m.status === 'ATIVO' && m.valor_pago != null)
+          .reduce((sum, m) => sum + Number(m.valor_pago), 0)
 
-        const vencimentos = (matriculasMes || []).filter((m: any) => m.status === 'VENCIDO').length
+        const vencimentos = matriculasMes.filter((m) => m.status === 'VENCIDO').length
 
         const recentData = await matriculasRecentes(academiaId, 5)
-        const formattedActivities = (recentData || []).map((m: any) => ({
-          id: m.id,
-          aluno_nome: m.perfis?.nome_completo || 'Aluno Desconhecido',
-          plano_nome: m.planos?.nome || 'Plano Personalizado',
-          valor: Number(m.valor_pago || 0),
-          data: m.criado_em,
-        }))
+        const formattedActivities = (recentData ?? []).map((m: Record<string, unknown>) => {
+          const perfis = m.perfis as { nome_completo?: string } | undefined
+          const planos = m.planos as { nome?: string } | undefined
+          return {
+            id: String(m.id ?? ''),
+            aluno_nome: perfis?.nome_completo || 'Aluno',
+            plano_nome: planos?.nome || 'Plano',
+            valor: Number(m.valor_pago ?? 0),
+            data: String(m.criado_em ?? ''),
+          }
+        })
 
         setStats({
           totalAlunos,
-          alunosAtivos: totalAlunos,
           totalTreinos,
-          semTreino: Math.max(0, totalAlunos - totalTreinos),
           receitaMensal: receita,
           vencimentosMes: vencimentos,
         })
@@ -99,8 +103,8 @@ export default function DashboardPage() {
       }
     }
 
-    loadDashboard()
-  }, [authLoading, academiaId, router])
+    void loadDashboard()
+  }, [authLoading, academiaId])
 
   const handleExportPDF = async () => {
     if (isReceptionist) return
@@ -110,19 +114,23 @@ export default function DashboardPage() {
       const allMatriculas = await matriculasTodas(academiaId)
 
       const columns = ['Aluno', 'Plano', 'Valor', 'Data', 'Status']
-      const rows = (allMatriculas || []).map((m: any) => [
-        m.perfis?.nome_completo || 'N/A',
-        m.planos?.nome || 'Personalizado',
-        `R$ ${Number(m.valor_pago || 0).toFixed(2)}`,
-        new Date(m.criado_em).toLocaleDateString('pt-BR'),
-        m.status
-      ])
+      const rows = (allMatriculas ?? []).map((m: Record<string, unknown>) => {
+        const perfis = m.perfis as { nome_completo?: string } | undefined
+        const planos = m.planos as { nome?: string } | undefined
+        return [
+          perfis?.nome_completo || '—',
+          planos?.nome || '—',
+          `R$ ${Number(m.valor_pago ?? 0).toFixed(2)}`,
+          new Date(String(m.criado_em ?? '')).toLocaleDateString('pt-BR'),
+          String(m.status ?? ''),
+        ]
+      })
 
       ReportsService.exportToPDF(
-        columns, 
-        rows, 
-        'Relatório Geral de Matrículas e Faturamento',
-        `fitmanager-relatorio-${new Date().toISOString().split('T')[0]}`
+        columns,
+        rows,
+        'Relatório de matrículas',
+        `fitmanager-${new Date().toISOString().split('T')[0]}`
       )
     } finally {
       setIsExporting(false)
@@ -136,202 +144,152 @@ export default function DashboardPage() {
       if (!academiaId) return
       const allMatriculas = await matriculasTodas(academiaId)
 
-      const formattedData = (allMatriculas || []).map((m: any) => ({
-        'Aluno': m.perfis?.nome_completo,
-        'Plano': m.planos?.nome,
-        'Valor (R$)': Number(m.valor_pago || 0),
-        'Data': new Date(m.criado_em).toLocaleDateString('pt-BR'),
-        'Status': m.status
-      }))
+      const formattedData = (allMatriculas ?? []).map((m: Record<string, unknown>) => {
+        const perfis = m.perfis as { nome_completo?: string } | undefined
+        const planos = m.planos as { nome?: string } | undefined
+        return {
+          Aluno: perfis?.nome_completo,
+          Plano: planos?.nome,
+          'Valor (R$)': Number(m.valor_pago ?? 0),
+          Data: new Date(String(m.criado_em ?? '')).toLocaleDateString('pt-BR'),
+          Status: m.status,
+        }
+      })
 
-      ReportsService.exportToExcel(
-        formattedData, 
-        `fitmanager-faturamento-${new Date().toISOString().split('T')[0]}`
-      )
+      ReportsService.exportToExcel(formattedData, `fitmanager-${new Date().toISOString().split('T')[0]}`)
     } finally {
       setIsExporting(false)
     }
   }
 
-  const cards = [
+  const statItems = [
+    { label: 'Alunos', value: String(stats.totalAlunos) },
     {
-      label: 'Alunos Totais',
-      value: stats.totalAlunos,
-      icon: <Users className="w-5 h-5" />,
-      color: 'text-white',
-      bg: 'bg-blue-500/10',
-      border: 'border-blue-500/20'
-    },
-    {
-      label: isReceptionist ? 'Faturamento (Mês)' : 'Receita (Mês)',
+      label: isReceptionist ? 'Faturamento (mês)' : 'Receita (mês)',
       value: `R$ ${stats.receitaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      icon: <TrendingUp className="w-5 h-5" />,
-      color: 'text-[#F2B705]',
-      bg: 'bg-[#F2B705]/10',
-      border: 'border-[#F2B705]/20'
+      accent: true,
     },
-    {
-      label: 'Fichas de Treino',
-      value: stats.totalTreinos,
-      icon: <Dumbbell className="w-5 h-5" />,
-      color: 'text-white',
-      bg: 'bg-purple-500/10',
-      border: 'border-purple-500/20'
-    },
-    {
-      label: 'Pendências',
-      value: stats.vencimentosMes,
-      icon: <AlertTriangle className="w-5 h-5" />,
-      color: 'text-red-400',
-      bg: 'bg-red-500/10',
-      border: 'border-red-500/20'
-    },
+    { label: 'Fichas', value: String(stats.totalTreinos) },
+    { label: 'Vencidos (mês)', value: String(stats.vencimentosMes) },
   ]
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="pb-8 border-b border-[#585759]/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="min-h-0 p-5 sm:p-8">
+      <div className="mx-auto max-w-4xl space-y-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#F2B705]">Painel Administrativo</h1>
-            <p className="text-[#A6A6A6] mt-1">
-              Bem-vindo de volta, <span className="text-white font-medium">{profile?.nome_completo || 'Usuário'}</span>.
-            </p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-[#585759]">Dashboard</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
+              Olá, {profile?.nome_completo?.split(' ')[0] || 'equipe'}
+            </h1>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!isReceptionist && (
               <>
-                <button 
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isExporting}
                   onClick={handleExportPDF}
-                  disabled={isExporting}
-                  className="px-4 py-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm font-bold hover:bg-red-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                  className="h-9 border-[#585759]/40 bg-transparent text-[#A6A6A6] hover:bg-[#585759]/15 hover:text-white"
                 >
-                  <FileDown className="w-4 h-4" />
+                  <FileDown className="mr-1.5 h-3.5 w-3.5" />
                   PDF
-                </button>
-                <button 
-                  onClick={handleExportExcel}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
                   disabled={isExporting}
-                  className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-sm font-bold hover:bg-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                  onClick={handleExportExcel}
+                  className="h-9 border-[#585759]/40 bg-transparent text-[#A6A6A6] hover:bg-[#585759]/15 hover:text-white"
                 >
-                  <FileSpreadsheet className="w-4 h-4" />
+                  <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
                   Excel
-                </button>
+                </Button>
               </>
             )}
-            <button 
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 bg-[#F2B705] px-4 font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
               onClick={() => router.push('/planos')}
-              className="px-4 py-2.5 bg-[#F2B705] border border-[#F2B705] rounded-xl text-[#0D0D0D] text-sm font-bold hover:brightness-110 transition-all flex items-center gap-2"
             >
-              <CreditCard className="w-4 h-4" />
               Financeiro
-            </button>
+            </Button>
           </div>
-        </header>
+        </div>
 
         {loadError && !loading && (
-          <div className="mt-8 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-sm">
-            <p className="font-semibold mb-1">Erro ao carregar o painel</p>
-            <p className="text-red-200/90">{loadError}</p>
-            <p className="mt-2 text-[#A6A6A6] text-xs">
-              Regras ou índices do Firestore em falta são causas comuns. Abra F12 → Consola para mais detalhes.
-            </p>
+          <div className="rounded-lg border border-red-500/25 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+            {loadError}
           </div>
         )}
 
         {loading ? (
-          <div className="mt-12 flex justify-center">
-            <div className="w-10 h-10 border-4 border-[#585759] border-t-[#F2B705] rounded-full animate-spin" />
+          <div className="flex justify-center py-16">
+            <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#585759]/50 border-t-[#F2B705]" />
           </div>
         ) : (
           <>
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {cards.map((card, i) => (
-                <div key={i} className={`bg-[#0D0D0D] border ${card.border} rounded-2xl p-6 shadow-xl flex items-center gap-4 hover:translate-y-[-4px] transition-all duration-300`}>
-                  <div className={`${card.bg} p-3 rounded-xl shrink-0`}>
-                    <span className={card.color}>{card.icon}</span>
+            <section className="rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60">
+              <div className="grid grid-cols-2 divide-x divide-[#585759]/20 md:grid-cols-4">
+                {statItems.map((item) => (
+                  <div key={item.label} className="px-4 py-5 sm:px-5">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-[#585759]">{item.label}</p>
+                    <p
+                      className={`mt-2 text-lg font-semibold tabular-nums sm:text-xl ${item.accent ? 'text-[#F2B705]' : 'text-white'}`}
+                    >
+                      {item.value}
+                    </p>
                   </div>
-                  <div>
-                    <p className="text-[#A6A6A6] text-[10px] font-bold uppercase tracking-widest">{card.label}</p>
-                    <p className={`text-2xl font-bold mt-0.5 ${card.color}`}>{card.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </section>
 
-            <div className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Gráfico de Faturamento - Oculto para Recepcionistas conforme plano */}
+            <div className="grid gap-8 lg:grid-cols-5 lg:gap-10">
               {!isReceptionist ? (
-                <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl">
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-white font-bold text-lg">Desempenho Financeiro</h2>
-                      <p className="text-[#A6A6A6] text-xs">Faturamento mensal consolidado (R$)</p>
-                    </div>
-                    <div className="p-2 bg-[#F2B705]/10 rounded-lg">
-                      <TrendingUp className="w-5 h-5 text-[#F2B705]" />
-                    </div>
+                <section className="rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60 p-5 lg:col-span-3">
+                  <h2 className="text-sm font-medium text-[#A6A6A6]">Faturamento mensal</h2>
+                  <div className="mt-4 min-h-[220px]">
+                    <RevenueChart academiaId={academiaId || ''} />
                   </div>
-                  <RevenueChart academiaId={academiaId || ''} />
-                </div>
+                </section>
               ) : (
-                <div className="lg:col-span-2 bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl flex flex-col items-center justify-center text-center p-12">
-                  <div className="p-4 bg-[#585759]/10 rounded-full mb-4">
-                    <TrendingUp className="w-10 h-10 text-[#585759]" />
-                  </div>
-                  <h2 className="text-white font-bold text-xl mb-2">Relatórios Consolidados</h2>
-                  <p className="text-[#A6A6A6] max-w-sm">
-                    Gráficos de desempenho histórico estão restritos ao administrador da unidade.
-                  </p>
-                </div>
+                <section className="flex min-h-[220px] flex-col justify-center rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60 px-5 py-8 text-center lg:col-span-3">
+                  <p className="text-sm text-[#585759]">Gráfico financeiro disponível apenas para administradores.</p>
+                </section>
               )}
 
-              {/* Atividades Recentes */}
-              <div className="bg-[#0D0D0D] border border-[#585759]/30 rounded-2xl p-6 shadow-2xl">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-white font-bold text-lg">Atividade Recente</h2>
-                  <Clock className="w-5 h-5 text-[#A6A6A6]" />
-                </div>
-                
-                <div className="space-y-6">
+              <section className="rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60 p-5 lg:col-span-2">
+                <h2 className="text-sm font-medium text-[#A6A6A6]">Últimas matrículas</h2>
+                <ul className="mt-4 divide-y divide-[#585759]/15">
                   {recentActivities.length === 0 ? (
-                    <div className="text-center py-10">
-                      <p className="text-[#585759] text-sm italic">Nenhuma atividade recente encontrada.</p>
-                    </div>
+                    <li className="py-8 text-center text-sm text-[#585759]">Nenhuma matrícula recente.</li>
                   ) : (
-                    recentActivities.map((activity) => (
-                      <div key={activity.id} className="flex items-start gap-4 group">
-                        <div className="w-10 h-10 rounded-full bg-[#585759]/20 flex items-center justify-center shrink-0 border border-[#585759]/20 group-hover:border-[#F2B705]/50 transition-colors">
-                          <UserCheck className="w-5 h-5 text-[#A6A6A6] group-hover:text-[#F2B705]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white text-sm font-semibold truncate leading-tight">
-                            {activity.aluno_nome}
-                          </p>
-                          <p className="text-[#A6A6A6] text-[11px] mt-0.5 truncate">
-                            Matrícula: {activity.plano_nome}
-                          </p>
-                          <div className="flex items-center justify-between mt-2">
-                             <span className="text-[10px] text-[#585759]">
-                              {new Date(activity.data).toLocaleDateString('pt-BR')}
-                            </span>
-                            <span className="text-emerald-400 text-xs font-bold font-mono">
-                              + R$ {activity.valor.toFixed(2)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                    recentActivities.map((a) => (
+                      <li key={a.id} className="flex flex-col gap-1 py-3 first:pt-0">
+                        <span className="truncate text-sm font-medium text-white">{a.aluno_nome}</span>
+                        <span className="truncate text-xs text-[#585759]">{a.plano_nome}</span>
+                        <span className="flex justify-between text-xs text-[#585759]">
+                          <span>{new Date(a.data).toLocaleDateString('pt-BR')}</span>
+                          <span className="tabular-nums text-[#A6A6A6]">
+                            R$ {a.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </span>
+                      </li>
                     ))
                   )}
-                </div>
-                
-                <button 
+                </ul>
+                <button
+                  type="button"
                   onClick={() => router.push('/planos')}
-                  className="w-full mt-8 py-3 border border-dashed border-[#585759]/50 rounded-xl text-[#A6A6A6] text-xs font-medium hover:border-[#F2B705]/50 hover:text-white transition-all"
+                  className="mt-4 w-full rounded-lg py-2 text-center text-xs font-medium text-[#585759] transition-colors hover:text-[#F2B705]"
                 >
-                  Ver todo o financeiro
+                  Ver planos e matrículas
                 </button>
-              </div>
+              </section>
             </div>
           </>
         )}
