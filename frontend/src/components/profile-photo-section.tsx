@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { ref, uploadBytesResumable, getDownloadURL, type UploadTask } from 'firebase/storage'
 import { updateProfile } from 'firebase/auth'
 import { getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase'
 import { setPerfil } from '@/lib/firestore'
@@ -10,6 +10,47 @@ import { Button } from '@/components/ui/button'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 
 const MAX_BYTES = 2 * 1024 * 1024
+const UPLOAD_TIMEOUT_MS = 90_000
+
+function runUploadTask(task: UploadTask, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      task.cancel()
+    }, timeoutMs)
+    task.on(
+      'state_changed',
+      () => {},
+      (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve()
+      }
+    )
+  })
+}
+
+function storageOrNetworkMessage(err: unknown): string {
+  const code =
+    err && typeof err === 'object' && 'code' in err && typeof (err as { code: string }).code === 'string'
+      ? (err as { code: string }).code
+      : ''
+  if (code === 'storage/unauthorized') {
+    return 'Sem permissão no Storage. Publique firebase/storage.rules e confirme que está logado.'
+  }
+  if (code === 'storage/canceled') {
+    return 'Envio cancelado ou tempo esgotado. Verifique a conexão ou use uma imagem menor.'
+  }
+  if (code === 'storage/retry-limit-exceeded' || code === 'storage/unknown') {
+    return 'Falha de rede ao enviar. Tente de novo em instantes.'
+  }
+  if (code === 'storage/quota-exceeded') {
+    return 'Limite de armazenamento do projeto atingido no Firebase.'
+  }
+  return 'Não foi possível enviar a foto. Confira se o Firebase Storage está ativo, se NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET no Vercel é o bucket correto (ex.: projeto.firebasestorage.app) e se as regras foram publicadas.'
+}
 
 type Props = {
   userId: string
@@ -34,24 +75,36 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
       alert('Use uma imagem de até 2 MB.')
       return
     }
+    const auth = getFirebaseAuth()
+    const u = auth.currentUser
+    if (!u || u.uid !== userId) {
+      alert('Sessão inválida. Saia e entre novamente.')
+      return
+    }
+
     setBusy(true)
     try {
-      const auth = getFirebaseAuth()
-      const u = auth.currentUser
-      if (!u || u.uid !== userId) return
       const ext = file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg'
+      const contentType =
+        file.type === 'image/jpg' ? 'image/jpeg' : file.type.startsWith('image/') ? file.type : 'image/jpeg'
+
       const storage = getFirebaseStorage()
       const pathRef = ref(storage, `avatars/${u.uid}/profile.${ext}`)
-      await uploadBytes(pathRef, file, { contentType: file.type })
+      const task = uploadBytesResumable(pathRef, file, { contentType })
+      await runUploadTask(task, UPLOAD_TIMEOUT_MS)
+
       const url = await getDownloadURL(pathRef)
       await setPerfil(u.uid, { foto_url: url })
-      await updateProfile(u, { photoURL: url })
       onChange(url)
+
+      try {
+        await updateProfile(u, { photoURL: url })
+      } catch (authErr) {
+        console.warn('Não foi possível atualizar photoURL no Auth:', authErr)
+      }
     } catch (err) {
       console.error(err)
-      alert(
-        'Não foi possível enviar a foto. Ative o Firebase Storage no console e publique as regras (firebase/storage.rules).'
-      )
+      alert(storageOrNetworkMessage(err))
     } finally {
       setBusy(false)
     }
@@ -62,10 +115,17 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
     try {
       const auth = getFirebaseAuth()
       const u = auth.currentUser
-      if (!u || u.uid !== userId) return
+      if (!u || u.uid !== userId) {
+        alert('Sessão inválida. Saia e entre novamente.')
+        return
+      }
       await setPerfil(u.uid, { foto_url: null })
-      await updateProfile(u, { photoURL: null })
       onChange(null)
+      try {
+        await updateProfile(u, { photoURL: null })
+      } catch (authErr) {
+        console.warn('Não foi possível limpar photoURL no Auth:', authErr)
+      }
     } catch (err) {
       console.error(err)
       alert('Erro ao remover foto.')

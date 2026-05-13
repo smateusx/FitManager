@@ -7,9 +7,16 @@ const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() || undefined,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+}
+
+function resolveStorageGsUrl(): string | undefined {
+  const raw = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim()
+  if (!raw) return undefined
+  if (raw.startsWith('gs://')) return raw
+  return `gs://${raw}`
 }
 
 function hasConfig() {
@@ -44,7 +51,9 @@ export function getDb(): Firestore {
 }
 
 export function getFirebaseStorage(): FirebaseStorage {
-  return getStorage(getFirebaseApp())
+  const app = getFirebaseApp()
+  const gs = resolveStorageGsUrl()
+  return gs ? getStorage(app, gs) : getStorage(app)
 }
 
 export { hasConfig }
