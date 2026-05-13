@@ -1,17 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signInWithPopup,
-  GoogleAuthProvider,
-} from 'firebase/auth'
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
+import { consumeGoogleRedirectResult, signInWithGoogle } from '@/lib/google-sign-in'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { AuthShell } from '@/components/auth-shell'
@@ -39,10 +35,11 @@ function firebaseAuthMessage(err: unknown): string {
   if (code === 'auth/account-exists-with-different-credential') {
     return 'Já existe uma conta com este e-mail usando outro método. Entre com e-mail e senha.'
   }
+  if (code === 'auth/unauthorized-domain') {
+    return 'Este site não está autorizado no Firebase. Em Authentication → Settings, adicione o domínio (ex.: fitmanager-web.vercel.app).'
+  }
   return 'Não foi possível entrar. Verifique os dados e tente novamente.'
 }
-
-const googleProvider = new GoogleAuthProvider()
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -52,6 +49,23 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const [resetMsg, setResetMsg] = useState<string | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    let cancelled = false
+    void consumeGoogleRedirectResult(getFirebaseAuth())
+      .then(async (cred) => {
+        if (cancelled || !cred?.user) return
+        await cred.user.reload()
+        const path = await resolvePostLoginPath(cred.user)
+        router.replace(path)
+      })
+      .catch((err) => {
+        if (!cancelled) setErrorMsg(firebaseAuthMessage(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -76,7 +90,8 @@ export default function LoginPage() {
     setErrorMsg('')
     setResetMsg(null)
     try {
-      const cred = await signInWithPopup(getFirebaseAuth(), googleProvider)
+      const cred = await signInWithGoogle(getFirebaseAuth())
+      if (!cred) return
       await cred.user.reload()
       const path = await resolvePostLoginPath(cred.user)
       router.push(path)
