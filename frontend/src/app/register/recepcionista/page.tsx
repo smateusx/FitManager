@@ -108,7 +108,7 @@ function RegisterRecepcionistaForm() {
             </p>
             <Button
               type="button"
-              onClick={() => router.push('/login')}
+              onClick={() => router.push('/login/recepcionista')}
               className="h-11 w-full bg-[#F2B705] font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
             >
               Ir para o login
@@ -225,7 +225,7 @@ function RegisterRecepcionistaForm() {
           </form>
         </CardContent>
         <CardFooter className="border-t border-[#585759]/30 pt-4">
-          <Link href="/login" className="w-full text-center text-sm text-[#585759] hover:text-[#F2B705]">
+          <Link href="/login/recepcionista" className="w-full text-center text-sm text-[#585759] hover:text-[#F2B705]">
             Já tenho conta — entrar
           </Link>
         </CardFooter>

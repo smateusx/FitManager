@@ -56,7 +56,6 @@ export default function MeuTreinoPage() {
   const [repsValue, setRepsValue] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-  const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'treinos' | 'financeiro'>('treinos')
   const [matriculas, setMatriculas] = useState<
     Awaited<ReturnType<typeof listMatriculasByAluno>>
@@ -69,7 +68,7 @@ export default function MeuTreinoPage() {
       const u = getFirebaseAuth().currentUser
 
       if (!u) {
-        router.push('/login')
+        router.push('/login/aluno')
         return
       }
 
@@ -87,7 +86,6 @@ export default function MeuTreinoPage() {
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserId(u.uid)
-        setUserPhotoUrl(perfil.foto_url ?? null)
       }
 
       const fichasData = await listFichasByAluno(u.uid)
@@ -103,7 +101,7 @@ export default function MeuTreinoPage() {
 
   const handleLogout = async () => {
     await signOut(getFirebaseAuth())
-    router.push('/login')
+    router.push('/login/aluno')
   }
 
   const handleSaveCarga = async (ex: Exercicio) => {
@@ -163,11 +161,7 @@ export default function MeuTreinoPage() {
               onClick={() => router.push('/meu-perfil')}
               className="group flex min-w-0 items-center gap-2 rounded-xl border border-transparent px-2 py-1.5 transition-all hover:border-[#585759]/30 hover:bg-[#585759]/20 sm:gap-3 sm:px-3"
             >
-              <ProfileAvatar
-                fotoUrl={userPhotoUrl}
-                name={userName}
-                sizeClass="h-8 w-8 text-[10px] border border-[#F2B705]/35"
-              />
+              <ProfileAvatar name={userName} sizeClass="h-8 w-8 text-[10px]" />
               <span className="text-sm font-medium text-[#A6A6A6] group-hover:text-white truncate hidden sm:inline max-w-[8rem]">
                 {userName.split(' ')[0]}
               </span>

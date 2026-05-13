@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 import { updatePassword, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
-import { ProfilePhotoSection } from '@/components/profile-photo-section'
 import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/components/password-session-after-change'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Shield, Smartphone, User, Lock, Save, Loader2, CheckCircle2 } from 'lucide-react'
+import { ProfileAvatar } from '@/components/profile-avatar'
 
 type PerfilDoc = NonNullable<Awaited<ReturnType<typeof getPerfil>>>
 
@@ -25,7 +25,6 @@ export default function PerfilPage() {
 
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordSessionMode, setPasswordSessionMode] = useState<PasswordSessionMode>('stay')
@@ -59,7 +58,6 @@ export default function PerfilPage() {
         setPerfil(data)
         setNome(data.nome_completo || '')
         setTelefone(data.telefone || '')
-        setFotoUrl(data.foto_url ?? null)
       } catch (err) {
         console.error('Erro ao carregar perfil:', err)
       } finally {
@@ -111,11 +109,14 @@ export default function PerfilPage() {
       if (!u) return
       await updatePassword(u, newPassword)
 
+      const logoutPath =
+        perfil?.role === 'RECEPCIONISTA' ? '/login/recepcionista' : '/login/academia'
+
       if (passwordSessionMode === 'sign_out_here') {
         setNewPassword('')
         setConfirmPassword('')
         await signOut(auth)
-        router.replace('/login')
+        router.replace(logoutPath)
         return
       }
 
@@ -161,12 +162,10 @@ export default function PerfilPage() {
             <div className="rounded-3xl border border-[#585759]/30 bg-[#0D0D0D] p-6 shadow-2xl sm:p-8">
               <div className="flex flex-col items-center text-center">
                 {userId ? (
-                  <ProfilePhotoSection
-                    userId={userId}
-                    displayName={nome || perfil?.nome_completo || '?'}
-                    fotoUrl={fotoUrl}
-                    onChange={setFotoUrl}
-                  />
+                  <div className="flex flex-col items-center gap-3">
+                    <ProfileAvatar name={nome || perfil?.nome_completo || '?'} sizeClass="h-24 w-24 text-2xl" />
+                    <p className="text-sm font-medium text-white">{nome || perfil?.nome_completo || 'Perfil'}</p>
+                  </div>
                 ) : null}
               </div>
 

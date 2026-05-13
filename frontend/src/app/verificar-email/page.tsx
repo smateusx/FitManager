@@ -9,7 +9,7 @@ import { AuthShell } from '@/components/auth-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Mail, Loader2 } from 'lucide-react'
-import { resolvePostLoginPath } from '@/lib/post-login'
+import { resolvePostLogin } from '@/lib/post-login'
 
 export default function VerificarEmailPage() {
   const router = useRouter()
@@ -29,8 +29,12 @@ export default function VerificarEmailPage() {
     void u.reload().then(async () => {
       const fresh = auth.currentUser
       if (fresh?.emailVerified) {
-        const path = await resolvePostLoginPath(fresh)
-        router.replace(path)
+        const r = await resolvePostLogin(fresh)
+        if (!r.ok) {
+          router.replace(`/login?erro=${encodeURIComponent(r.message)}`)
+          return
+        }
+        router.replace(r.path)
         return
       }
       setLoading(false)
@@ -61,8 +65,12 @@ export default function VerificarEmailPage() {
       await u.reload()
       const fresh = auth.currentUser
       if (fresh?.emailVerified) {
-        const path = await resolvePostLoginPath(fresh)
-        router.replace(path)
+        const r = await resolvePostLogin(fresh)
+        if (!r.ok) {
+          router.replace(`/login?erro=${encodeURIComponent(r.message)}`)
+        } else {
+          router.replace(r.path)
+        }
       } else {
         setInfo('Ainda não detectamos a verificação. Abra o link no e-mail ou aguarde um instante.')
         setLoading(false)
