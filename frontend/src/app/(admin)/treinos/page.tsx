@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getFirebaseAuth } from '@/lib/firebase'
 import {
@@ -44,7 +44,7 @@ type AlunoOption = {
 const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10-12', carga: '', descanso: '60s' }
 
 export default function TreinosPage() {
-  const { profile, loading: authLoading, isAdmin, isReceptionist } = useAuth()
+  const { loading: authLoading, isReceptionist } = useAuth()
   const [fichas, setFichas] = useState<Ficha[]>([])
   const [alunos, setAlunos] = useState<AlunoOption[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,12 +61,7 @@ export default function TreinosPage() {
 
   const router = useRouter()
 
-  useEffect(() => { 
-    if (authLoading) return
-    fetchAll() 
-  }, [authLoading])
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true)
     const u = getFirebaseAuth().currentUser
     if (!u) {
@@ -74,9 +69,9 @@ export default function TreinosPage() {
       return
     }
 
-    const profile = await getPerfil(u.uid)
-    if (profile?.academia_id) setAcademiaId(profile.academia_id)
-    const aid = profile?.academia_id
+    const profileDoc = await getPerfil(u.uid)
+    if (profileDoc?.academia_id) setAcademiaId(profileDoc.academia_id)
+    const aid = profileDoc?.academia_id
     if (!aid) {
       setLoading(false)
       return
@@ -89,7 +84,14 @@ export default function TreinosPage() {
     setFichas((fichasData as Ficha[]) ?? [])
     setAlunos((alunosData as AlunoOption[]) ?? [])
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => {
+    if (authLoading) return
+    queueMicrotask(() => {
+      void fetchAll()
+    })
+  }, [authLoading, fetchAll])
 
   const addExercicio = () => setExercicios(prev => [...prev, { ...BLANK_EXERCICIO }])
   const removeExercicio = (i: number) => setExercicios(prev => prev.filter((_, idx) => idx !== i))
@@ -144,15 +146,18 @@ export default function TreinosPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="max-w-5xl mx-auto">
-        <header className="flex items-center justify-between pb-8 border-b border-[#585759]/30">
-          <div>
-            <h1 className="text-3xl font-bold text-[#F2B705]">Fichas de Treino</h1>
-            <p className="text-[#A6A6A6] mt-1">Crie e gerencie os treinos dos seus alunos.</p>
+    <div className="min-h-0 p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-5xl">
+        <header className="flex flex-col gap-4 border-b border-[#585759]/30 pb-6 sm:flex-row sm:items-center sm:justify-between sm:pb-8">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-[#F2B705] sm:text-3xl">Fichas de Treino</h1>
+            <p className="mt-1 text-sm text-[#A6A6A6] sm:text-base">Crie e gerencie os treinos dos seus alunos.</p>
           </div>
           {!isReceptionist && (
-            <Button onClick={() => setShowModal(true)} className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20">
+            <Button
+              onClick={() => setShowModal(true)}
+              className="w-full shrink-0 bg-[#F2B705] font-bold text-[#0D0D0D] shadow-lg shadow-[#F2B705]/20 hover:bg-[#BF9004] sm:w-auto"
+            >
               <Plus className="w-4 h-4 mr-2" /> Nova Ficha
             </Button>
           )}
@@ -170,7 +175,9 @@ export default function TreinosPage() {
               </div>
               <p className="text-white font-semibold text-lg">Nenhuma ficha cadastrada ainda</p>
               {!isReceptionist && (
-                <p className="text-[#A6A6A6] text-sm max-w-xs">Clique em "Nova Ficha" para montar o primeiro treino de um aluno.</p>
+                <p className="max-w-xs text-sm text-[#A6A6A6]">
+                  Clique em Nova Ficha para montar o primeiro treino de um aluno.
+                </p>
               )}
             </div>
           ) : (
@@ -179,28 +186,39 @@ export default function TreinosPage() {
               return (
                 <div key={ficha.id} className="border border-[#585759]/50 rounded-xl overflow-hidden bg-[#0D0D0D]/80 hover:border-[#585759] transition-colors">
                   <button
-                    className="w-full flex items-center justify-between p-5 text-left"
+                    type="button"
+                    className="flex w-full flex-col gap-3 p-4 text-left sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5"
                     onClick={() => setExpandedId(isExpanded ? null : ficha.id)}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
                       <div className="p-2 bg-[#F2B705]/10 rounded-lg">
                         <Dumbbell className="w-5 h-5 text-[#F2B705]" />
                       </div>
-                      <div>
-                        <p className="text-white font-semibold">{ficha.nome}</p>
-                        <p className="text-[#A6A6A6] text-sm mt-0.5">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-white">{ficha.nome}</p>
+                        <p className="mt-0.5 text-sm text-[#A6A6A6]">
                           Aluno: <span className="text-white">{ficha.perfis?.nome_completo || 'Sem nome'}</span>
-                          {ficha.objetivo && <span className="ml-3 text-[#585759]">• {ficha.objetivo}</span>}
+                          {ficha.objetivo && (
+                            <span className="mt-1 block text-[#585759] sm:ml-3 sm:mt-0 sm:inline">
+                              • {ficha.objetivo}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
                       <span className="text-xs text-[#585759] hidden sm:block">
                         {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
                       </span>
                       {!isReceptionist && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(ficha.id) }}
-                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-[#585759] hover:text-red-500 transition-colors">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(ficha.id)
+                          }}
+                          className="rounded-lg p-1.5 text-[#585759] transition-colors hover:bg-red-500/10 hover:text-red-500"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
@@ -250,7 +268,7 @@ export default function TreinosPage() {
       {/* Create Ficha Modal */}
       {showModal && !isReceptionist && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-[#0D0D0D] border border-[#585759] rounded-2xl w-full max-w-2xl shadow-2xl my-8 animate-in zoom-in-95 duration-200">
+          <div className="my-8 w-full max-w-2xl rounded-2xl border border-[#585759] bg-[#0D0D0D] shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center sticky top-0 bg-[#0D0D0D] rounded-t-2xl z-10 text-white">
               <h2 className="text-xl font-bold">Nova Ficha de Treino</h2>
               <button onClick={() => { setShowModal(false); resetModal() }} className="text-[#A6A6A6] hover:text-white transition-colors">
@@ -310,7 +328,7 @@ export default function TreinosPage() {
                         <Input value={ex.nome} onChange={e => updateExercicio(i, 'nome', e.target.value)}
                           placeholder="Nome do exercício" required
                           className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]" />
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <div className="space-y-1">
                             <Label className="text-[#585759] text-xs">Séries</Label>
                             <Input type="number" value={ex.series} onChange={e => updateExercicio(i, 'series', Number(e.target.value))} min={1}
@@ -338,7 +356,7 @@ export default function TreinosPage() {
                 </div>
               </div>
 
-              <div className="p-5 border-t border-[#585759]/30 flex gap-3 justify-end bg-[#585759]/5 rounded-b-2xl">
+              <div className="flex flex-col-reverse gap-2 rounded-b-2xl border-t border-[#585759]/30 bg-[#585759]/5 p-5 sm:flex-row sm:justify-end sm:gap-3">
                 <Button type="button" variant="ghost" onClick={() => { setShowModal(false); resetModal() }}
                   className="text-[#A6A6A6] hover:text-white">Cancelar</Button>
                 <Button type="submit" disabled={saving}

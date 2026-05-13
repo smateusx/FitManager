@@ -252,8 +252,10 @@ export default function DashboardPage() {
               {!isReceptionist ? (
                 <section className="rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60 p-5 lg:col-span-3">
                   <h2 className="text-sm font-medium text-[#A6A6A6]">Faturamento mensal</h2>
-                  <div className="mt-4 min-h-[220px]">
-                    <RevenueChart academiaId={academiaId || ''} />
+                  <div className="mt-4 min-h-[220px] w-full min-w-0 overflow-x-auto">
+                    <div className="min-w-[280px]">
+                      <RevenueChart academiaId={academiaId || ''} />
+                    </div>
                   </div>
                 </section>
               ) : (

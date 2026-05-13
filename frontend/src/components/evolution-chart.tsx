@@ -9,36 +9,47 @@ type Props = {
   alunoId: string
 }
 
+type ChartPoint = {
+  data: string
+  carga: number
+  data_registro: string
+}
+
 export function EvolutionChart({ exercicioId, alunoId }: Props) {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchData = async () => {
+    let cancelled = false
+    void (async () => {
       const registros = await listRegistrosCarga(alunoId, exercicioId)
-      const formatted = (registros || []).map((r: any) => ({
-        ...r,
-        data: new Date(r.data_registro).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-        carga: Number(r.carga),
+      const formatted = (registros || []).map((r: Record<string, unknown>) => ({
+        data_registro: String(r.data_registro ?? ''),
+        data: new Date(String(r.data_registro ?? '')).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+        }),
+        carga: Number(r.carga ?? 0),
       }))
-      setData(formatted)
-      setLoading(false)
+      if (!cancelled) {
+        setData(formatted)
+        setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-
-    fetchData()
   }, [exercicioId, alunoId])
 
   if (loading)
-    return <div className="h-40 flex items-center justify-center text-[#A6A6A6] text-xs">Carregando gráfico...</div>
+    return <div className="flex h-40 items-center justify-center text-xs text-[#A6A6A6]">Carregando gráfico...</div>
   if (data.length === 0)
     return (
-      <div className="h-40 flex items-center justify-center text-[#585759] text-xs">
-        Nenhum registro de carga ainda.
-      </div>
+      <div className="flex h-40 items-center justify-center text-xs text-[#585759]">Nenhum registro de carga ainda.</div>
     )
 
   return (
-    <div className="h-60 w-full mt-4 bg-[#585759]/5 rounded-xl p-4 border border-[#585759]/10">
+    <div className="mt-4 h-60 w-full max-w-full rounded-xl border border-[#585759]/10 bg-[#585759]/5 p-4">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#585759" vertical={false} opacity={0.2} />
@@ -70,8 +81,8 @@ export function EvolutionChart({ exercicioId, alunoId }: Props) {
           />
         </LineChart>
       </ResponsiveContainer>
-      <div className="text-center mt-2">
-        <span className="text-[10px] text-[#A6A6A6] uppercase font-bold tracking-widest">
+      <div className="mt-2 text-center">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A6A6A6]">
           Evolução de Carga (kg)
         </span>
       </div>

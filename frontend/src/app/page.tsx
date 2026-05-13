@@ -5,8 +5,8 @@ export default function Home() {
   return (
     <div className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0D0D0D] text-white">
       <header className="sticky top-0 z-20 border-b border-[#585759]/20 bg-[#0D0D0D]/90 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F2B705]">
               <Dumbbell className="h-5 w-5 text-[#0D0D0D]" aria-hidden />
             </span>
@@ -14,7 +14,7 @@ export default function Home() {
               FitManager<span className="text-[#F2B705]">.</span>
             </span>
           </div>
-          <nav className="flex items-center gap-2">
+          <nav className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <Link
               href="/login"
               className="rounded-lg px-3 py-2 text-sm text-[#A6A6A6] transition-colors hover:text-white"
