@@ -129,7 +129,7 @@ export default function AlunosPage() {
                   alunos.map((aluno) => (
                     <TableRow key={aluno.id} className="border-[#585759]/20 hover:bg-[#585759]/5">
                       <TableCell className="font-medium text-white">{aluno.nome_completo}</TableCell>
-                      <TableCell className="text-[#A6A6A6]">{aluno.telefone || '—'}</TableCell>
+                      <TableCell className="text-[#A6A6A6]">{aluno.telefone || 'Não informado'}</TableCell>
                       <TableCell className="text-[#A6A6A6]">
                         {new Date(aluno.created_at).toLocaleDateString('pt-BR')}
                       </TableCell>
@@ -161,7 +161,7 @@ export default function AlunosPage() {
               <X className="h-5 w-5" />
             </button>
             <h2 className="mb-2 text-xl font-bold text-white sm:text-2xl">
-              {inviteModal === 'recepcionista' ? 'Convite — receção' : 'Link de convite — aluno'}
+              {inviteModal === 'recepcionista' ? 'Convite receção' : 'Link de convite aluno'}
             </h2>
             <p className="mb-6 text-sm text-[#A6A6A6]">
               {inviteModal === 'recepcionista'

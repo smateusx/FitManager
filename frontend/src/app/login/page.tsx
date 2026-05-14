@@ -35,7 +35,7 @@ function LoginHubInner() {
             href="/login/academia"
             className="rounded-xl border border-[#585759]/40 bg-[#0D0D0D] px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:border-[#F2B705]/50 hover:bg-[#585759]/10"
           >
-            Academia (dono / administrador)
+            Academia (dono ou administrador)
           </Link>
           <Link
             href="/login/recepcionista"

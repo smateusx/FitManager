@@ -92,8 +92,8 @@ export default function CobrancasPage() {
         const perfis = m.perfis as { nome_completo?: string } | undefined
         const planos = m.planos as { nome?: string } | undefined
         return [
-          perfis?.nome_completo || '—',
-          planos?.nome || '—',
+          perfis?.nome_completo || 'Não informado',
+          planos?.nome || 'Não informado',
           `R$ ${Number(m.valor_pago ?? 0).toFixed(2)}`,
           new Date(String(m.criado_em ?? '')).toLocaleDateString('pt-BR'),
           String(m.status ?? ''),

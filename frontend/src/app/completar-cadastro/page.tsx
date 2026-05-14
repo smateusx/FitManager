@@ -12,6 +12,7 @@ import {
   type Role,
 } from '@/lib/firestore'
 import { isValidCpf, normalizeCpfDigits } from '@/lib/cpf'
+import { isValidAcademyWhatsAppDigits, normalizeWhatsAppDigits } from '@/lib/whatsapp-contact'
 import { resolvePostLogin } from '@/lib/post-login'
 import { AuthShell } from '@/components/auth-shell'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,6 +43,7 @@ function CompletarCadastroForm() {
 
   const [fullName, setFullName] = useState('')
   const [gymName, setGymName] = useState('')
+  const [academyWhatsapp, setAcademyWhatsapp] = useState('')
   const [cpf, setCpf] = useState('')
   const [phone, setPhone] = useState('')
 
@@ -220,7 +222,13 @@ function CompletarCadastroForm() {
           setSaving(false)
           return
         }
-        const gymId = await createAcademia(gymName.trim())
+        const waDigits = normalizeWhatsAppDigits(academyWhatsapp)
+        if (!isValidAcademyWhatsAppDigits(waDigits)) {
+          setErrorMsg('Informe um WhatsApp válido da academia (DDD e número, com ou sem código 55).')
+          setSaving(false)
+          return
+        }
+        const gymId = await createAcademia(gymName.trim(), waDigits)
         await registerPerfilAndClaimCpf({
           userId: u.uid,
           cpfDigits: digits,
@@ -300,19 +308,39 @@ function CompletarCadastroForm() {
             </p>
           )}
           {!skipGymField && (
-            <div className="space-y-2">
-              <Label htmlFor="gymName" className="text-[#A6A6A6]">
-                Nome da academia
-              </Label>
-              <Input
-                id="gymName"
-                value={gymName}
-                onChange={(e) => setGymName(e.target.value)}
-                placeholder="Ex.: FitTech Gym"
-                className="h-11 border-[#585759] bg-[#0D0D0D] text-white"
-                required={!skipGymField}
-              />
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="gymName" className="text-[#A6A6A6]">
+                  Nome da academia
+                </Label>
+                <Input
+                  id="gymName"
+                  value={gymName}
+                  onChange={(e) => setGymName(e.target.value)}
+                  placeholder="Ex.: FitTech Gym"
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white"
+                  required={!skipGymField}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="academyWhatsapp" className="text-[#A6A6A6]">
+                  WhatsApp da academia para os alunos
+                </Label>
+                <Input
+                  id="academyWhatsapp"
+                  value={academyWhatsapp}
+                  onChange={(e) => setAcademyWhatsapp(e.target.value)}
+                  placeholder="DDD e número (ex.: 11999990000)"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  className="h-11 border-[#585759] bg-[#0D0D0D] text-white"
+                  required={!skipGymField}
+                />
+                <p className="text-xs text-[#585759]">
+                  Obrigatório para novas academias. Os alunos veem este contato quando precisam tirar dúvidas.
+                </p>
+              </div>
+            </>
           )}
           <div className="space-y-2">
             <Label htmlFor="fullName" className="text-[#A6A6A6]">
@@ -334,7 +362,7 @@ function CompletarCadastroForm() {
               id="cpf"
               value={cpf}
               onChange={(e) => setCpf(e.target.value)}
-              placeholder="000.000.000-00"
+              placeholder="11 dígitos"
               inputMode="numeric"
               autoComplete="off"
               className="h-11 border-[#585759] bg-[#0D0D0D] text-white"
