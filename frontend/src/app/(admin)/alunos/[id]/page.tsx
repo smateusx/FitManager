@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EvolutionChart } from '@/components/evolution-chart'
+import { TreinosPreProntosAluno } from '@/components/treinos-pre-prontos-aluno'
 import {
   User as UserIcon,
   Dumbbell,
@@ -362,13 +363,17 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {activeTab === 'treinos' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <TreinosPreProntosAluno context="admin" />
+
               {fichas.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-[#585759]/30 rounded-2xl">
+                <div className="text-center py-12 border border-dashed border-[#585759]/30 rounded-2xl">
                   <Dumbbell className="w-10 h-10 text-[#585759] mx-auto mb-3" />
-                  <p className="text-[#A6A6A6]">Este aluno ainda não possui fichas de treino.</p>
-                  <Button 
-                    variant="link" 
+                  <p className="text-[#A6A6A6]">
+                    Este aluno ainda não possui fichas de treino cadastradas pela academia.
+                  </p>
+                  <Button
+                    variant="link"
                     className="text-[#F2B705] mt-2"
                     onClick={() => router.push('/treinos')}
                   >
@@ -376,45 +381,60 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                   </Button>
                 </div>
               ) : (
-                fichas.map((ficha) => (
-                  <div key={ficha.id} className="border border-[#585759]/40 rounded-xl overflow-hidden bg-[#0D0D0D]/40">
-                    <div className="p-4 bg-[#585759]/10 flex items-center justify-between border-b border-[#585759]/20">
-                      <div>
-                        <h4 className="text-white font-bold">{ficha.nome}</h4>
-                        <p className="text-[#A6A6A6] text-xs">{ficha.objetivo || 'Sem objetivo definido'}</p>
-                      </div>
-                      <span className="text-[#585759] text-xs">
-                        Criada em {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                    <div className="p-4 overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-[#585759] uppercase text-[10px] tracking-widest text-left">
-                            <th className="pb-3 pr-4">Exercício</th>
-                            <th className="pb-3 px-2 text-center">Séries</th>
-                            <th className="pb-3 px-2 text-center">Reps</th>
-                            <th className="pb-3 px-2 text-center">Carga</th>
-                            <th className="pb-3 px-2 text-center">Rest</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#585759]/10">
-                          {ficha.exercicios.map((ex, i) => (
-                            <tr key={i} className="text-[#A6A6A6]">
-                              <td className="py-2.5 pr-4 text-white font-medium">{ex.nome}</td>
-                              <td className="py-2.5 px-2 text-center">{ex.series}</td>
-                              <td className="py-2.5 px-2 text-center">{ex.repeticoes}</td>
-                              <td className="py-2.5 px-2 text-center font-bold text-[#F2B705]">
-                                {ex.carga || 'Sem registro'}
-                              </td>
-                              <td className="py-2.5 px-2 text-center text-xs">{ex.descanso}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                <>
+                  <div className="border-t border-[#585759]/25 pt-6">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-[#585759]">
+                      Fichas deste aluno
+                    </p>
+                    <p className="mt-1 text-sm text-[#A6A6A6]">
+                      Treinos personalizados criados na gestão de treinos.
+                    </p>
                   </div>
-                ))
+                  <div className="space-y-4">
+                    {fichas.map((ficha) => (
+                      <div
+                        key={ficha.id}
+                        className="border border-[#585759]/40 rounded-xl overflow-hidden bg-[#0D0D0D]/40"
+                      >
+                        <div className="flex items-center justify-between border-b border-[#585759]/20 bg-[#585759]/10 p-4">
+                          <div>
+                            <h4 className="font-bold text-white">{ficha.nome}</h4>
+                            <p className="text-xs text-[#A6A6A6]">{ficha.objetivo || 'Sem objetivo definido'}</p>
+                          </div>
+                          <span className="text-xs text-[#585759]">
+                            Criada em {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto p-4">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-[10px] uppercase tracking-widest text-[#585759]">
+                                <th className="pb-3 pr-4">Exercício</th>
+                                <th className="px-2 pb-3 text-center">Séries</th>
+                                <th className="px-2 pb-3 text-center">Reps</th>
+                                <th className="px-2 pb-3 text-center">Carga</th>
+                                <th className="px-2 pb-3 text-center">Rest</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#585759]/10">
+                              {ficha.exercicios.map((ex, i) => (
+                                <tr key={i} className="text-[#A6A6A6]">
+                                  <td className="py-2.5 pr-4 font-medium text-white">{ex.nome}</td>
+                                  <td className="px-2 py-2.5 text-center">{ex.series}</td>
+                                  <td className="px-2 py-2.5 text-center">{ex.repeticoes}</td>
+                                  <td className="px-2 py-2.5 text-center font-bold text-[#F2B705]">
+                                    {ex.carga || 'Sem registro'}
+                                  </td>
+                                  <td className="px-2 py-2.5 text-center text-xs">{ex.descanso}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
