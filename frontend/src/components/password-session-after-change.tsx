@@ -39,7 +39,7 @@ export function PasswordSessionAfterChange({ value, onChange }: Props) {
         <span>
           <span className="font-medium text-white">Sair deste dispositivo</span>
           <span className="mt-0.5 block text-xs leading-snug text-[#585759]">
-            Aplica a nova senha e termina a sessão aqui — terá de entrar outra vez.
+            Aplica a nova senha e termina a sessão aqui. Você precisará entrar de novo.
           </span>
         </span>
       </label>

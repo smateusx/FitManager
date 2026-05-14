@@ -150,7 +150,7 @@ export default function PlanosPage() {
       plano_id: matPlanoId,
       data_inicio: matInicio,
       data_vencimento: vencimento,
-      valor_pago: matValorPago ? parseFloat(matValorPago) : null,
+      valor_pago: isReceptionist ? null : matValorPago ? parseFloat(matValorPago) : null,
       observacoes: matObs || null,
       status: 'ATIVO',
     })
@@ -171,6 +171,55 @@ export default function PlanosPage() {
   const ativos = matriculas.filter((m) => m.status === 'ATIVO').length
   const vencidos = matriculas.filter((m) => m.status === 'VENCIDO').length
   const receitaMes = matriculas.filter((m) => m.status === 'ATIVO').reduce((sum, m) => sum + (m.valor_pago ?? 0), 0)
+  const totalMatriculas = matriculas.length
+
+  const headerStats = isReceptionist
+    ? [
+        {
+          label: 'Matrículas ativas',
+          value: ativos,
+          icon: <Users className="w-5 h-5" />,
+          color: 'text-emerald-400',
+          bg: 'bg-emerald-500/10',
+        },
+        {
+          label: 'Matrículas vencidas',
+          value: vencidos,
+          icon: <AlertCircle className="w-5 h-5" />,
+          color: 'text-red-400',
+          bg: 'bg-red-500/10',
+        },
+        {
+          label: 'Total de matrículas',
+          value: totalMatriculas,
+          icon: <Users className="w-5 h-5" />,
+          color: 'text-[#A6A6A6]',
+          bg: 'bg-[#585759]/10',
+        },
+      ]
+    : [
+        {
+          label: 'Matrículas ativas',
+          value: ativos,
+          icon: <Users className="w-5 h-5" />,
+          color: 'text-emerald-400',
+          bg: 'bg-emerald-500/10',
+        },
+        {
+          label: 'Matrículas vencidas',
+          value: vencidos,
+          icon: <AlertCircle className="w-5 h-5" />,
+          color: 'text-red-400',
+          bg: 'bg-red-500/10',
+        },
+        {
+          label: 'Receita nas matrículas ativas',
+          value: `R$ ${receitaMes.toFixed(2).replace('.', ',')}`,
+          icon: <TrendingUp className="w-5 h-5" />,
+          color: 'text-[#F2B705]',
+          bg: 'bg-[#F2B705]/10',
+        },
+      ]
 
   return (
     <div className="min-h-0 p-4 sm:p-6 lg:p-8">
@@ -179,7 +228,9 @@ export default function PlanosPage() {
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-[#F2B705] sm:text-3xl">Planos & Pagamentos</h1>
             <p className="mt-1 text-sm text-[#A6A6A6] sm:text-base">
-              Gerencie matrículas e controle financeiro da academia.
+              {isReceptionist
+                ? 'Gerencie matrículas e consulte planos da academia.'
+                : 'Gerencie matrículas e controle financeiro da academia.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -203,29 +254,7 @@ export default function PlanosPage() {
 
         {!loading && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-8">
-            {[
-              {
-                label: 'Matrículas Ativas',
-                value: ativos,
-                icon: <Users className="w-5 h-5" />,
-                color: 'text-emerald-400',
-                bg: 'bg-emerald-500/10',
-              },
-              {
-                label: 'Vencidas',
-                value: vencidos,
-                icon: <AlertCircle className="w-5 h-5" />,
-                color: 'text-red-400',
-                bg: 'bg-red-500/10',
-              },
-              {
-                label: isReceptionist ? 'Faturamento Atual' : 'Receita (ativas)',
-                value: `R$ ${receitaMes.toFixed(2).replace('.', ',')}`,
-                icon: <TrendingUp className="w-5 h-5" />,
-                color: 'text-[#F2B705]',
-                bg: 'bg-[#F2B705]/10',
-              },
-            ].map((s, i) => (
+            {headerStats.map((s, i) => (
               <div key={i} className="bg-[#0D0D0D]/80 border border-[#585759]/50 rounded-xl p-5 flex items-center gap-4">
                 <div className={`${s.bg} p-3 rounded-xl`}>
                   <span className={s.color}>{s.icon}</span>
@@ -301,7 +330,9 @@ export default function PlanosPage() {
               {planos.map((p) => (
                 <div key={p.id} className="border border-[#585759]/40 rounded-xl p-4">
                   <p className="font-bold text-white">{p.nome}</p>
-                  <p className="text-[#F2B705] font-mono">R$ {Number(p.valor).toFixed(2)}</p>
+                  {!isReceptionist && (
+                    <p className="text-[#F2B705] font-mono">R$ {Number(p.valor).toFixed(2)}</p>
+                  )}
                   <p className="text-xs text-[#585759]">{p.duracao_dias} dias</p>
                 </div>
               ))}
@@ -399,7 +430,9 @@ export default function PlanosPage() {
                 <option value="">Selecione</option>
                 {planos.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.nome}
+                    {isReceptionist
+                      ? p.nome
+                      : `${p.nome} · R$ ${Number(p.valor).toFixed(2).replace('.', ',')}`}
                   </option>
                 ))}
               </select>
@@ -408,10 +441,18 @@ export default function PlanosPage() {
               <Label>Início</Label>
               <Input type="date" value={matInicio} onChange={(e) => setMatInicio(e.target.value)} className="mt-1" />
             </div>
-            <div>
-              <Label>Valor pago</Label>
-              <Input type="number" step="0.01" value={matValorPago} onChange={(e) => setMatValorPago(e.target.value)} className="mt-1" />
-            </div>
+            {!isReceptionist && (
+              <div>
+                <Label>Valor pago</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={matValorPago}
+                  onChange={(e) => setMatValorPago(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            )}
             <div>
               <Label>Observações</Label>
               <Input value={matObs} onChange={(e) => setMatObs(e.target.value)} className="mt-1" />

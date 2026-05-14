@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { updatePassword, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { getPerfil, setPerfil as savePerfilDoc } from '@/lib/firestore'
+import { getPerfil, setPerfil as savePerfilDoc, getAcademia, updateAcademiaContact } from '@/lib/firestore'
+import { isValidAcademyWhatsAppDigits, normalizeWhatsAppDigits } from '@/lib/whatsapp-contact'
 import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/components/password-session-after-change'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Shield, Smartphone, User, Lock, Save, Loader2, CheckCircle2 } from 'lucide-react'
 import { ProfileAvatar } from '@/components/profile-avatar'
+import { useAuth } from '@/hooks/use-auth'
 
 type PerfilDoc = NonNullable<Awaited<ReturnType<typeof getPerfil>>>
 
@@ -25,11 +27,13 @@ export default function PerfilPage() {
 
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
+  const [whatsappAcademia, setWhatsappAcademia] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordSessionMode, setPasswordSessionMode] = useState<PasswordSessionMode>('stay')
 
   const router = useRouter()
+  const { isAdmin } = useAuth()
 
   useEffect(() => {
     let cancelled = false
@@ -58,6 +62,12 @@ export default function PerfilPage() {
         setPerfil(data)
         setNome(data.nome_completo || '')
         setTelefone(data.telefone || '')
+        if (data.role === 'ADMIN' && data.academia_id) {
+          const ac = await getAcademia(data.academia_id)
+          if (!cancelled) setWhatsappAcademia(ac?.whatsapp_contato ?? '')
+        } else {
+          setWhatsappAcademia('')
+        }
       } catch (err) {
         console.error('Erro ao carregar perfil:', err)
       } finally {
@@ -81,7 +91,19 @@ export default function PerfilPage() {
         telefone: telefone,
       })
 
-      setSuccess('Perfil atualizado com sucesso!')
+      if (isAdmin && perfil?.role === 'ADMIN' && perfil.academia_id) {
+        const wd = normalizeWhatsAppDigits(whatsappAcademia)
+        if (!isValidAcademyWhatsAppDigits(wd)) {
+          alert(
+            'Informe um WhatsApp válido da academia (com DDD). Os alunos usam este número para falar com a equipe.'
+          )
+          setSaving(false)
+          return
+        }
+        await updateAcademiaContact(perfil.academia_id, wd)
+      }
+
+      setSuccess('Perfil atualizado com sucesso.')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro'
@@ -195,8 +217,28 @@ export default function PerfilPage() {
               </div>
 
               <form onSubmit={handleUpdateProfile} className="space-y-6">
+                {isAdmin && perfil?.academia_id ? (
+                  <div className="space-y-2">
+                    <Label className="text-[#A6A6A6]">WhatsApp da academia para os alunos</Label>
+                    <p className="text-xs text-[#585759]">
+                      Aparece para os alunos quando precisam tirar dúvidas. É obrigatório manter atualizado.
+                    </p>
+                    <div className="relative">
+                      <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#585759]" />
+                      <Input
+                        value={whatsappAcademia}
+                        onChange={(e) => setWhatsappAcademia(e.target.value)}
+                        placeholder="DDD e número (ex.: 11999990000)"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        required
+                        className="bg-[#0D0D0D] border-[#585759]/50 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl pl-12"
+                      />
+                    </div>
+                  </div>
+                ) : null}
                 <div className="space-y-2">
-                  <Label className="text-[#A6A6A6]">Nome Completo</Label>
+                  <Label className="text-[#A6A6A6]">Nome completo</Label>
                   <Input
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
@@ -205,13 +247,13 @@ export default function PerfilPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[#A6A6A6]">Telefone / WhatsApp</Label>
+                  <Label className="text-[#A6A6A6]">Telefone pessoal (opcional)</Label>
                   <div className="relative">
                     <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#585759]" />
                     <Input
                       value={telefone}
                       onChange={(e) => setTelefone(e.target.value)}
-                      placeholder="(00) 00000-0000"
+                      placeholder="DDD e número"
                       className="bg-[#0D0D0D] border-[#585759]/50 text-white focus-visible:ring-[#F2B705] h-12 rounded-xl pl-12"
                     />
                   </div>

@@ -60,13 +60,19 @@ export default function DashboardPage() {
 
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const matriculasMes = (await matriculasCriadasDesde(academiaId, startOfMonth)) as MatriculaMesRow[]
 
-        const receita = matriculasMes
-          .filter((m) => m.status === 'ATIVO' && m.valor_pago != null)
-          .reduce((sum, m) => sum + Number(m.valor_pago), 0)
-
-        const vencimentos = matriculasMes.filter((m) => m.status === 'VENCIDO').length
+        let receita = 0
+        let vencimentos = 0
+        if (!isReceptionist) {
+          const matriculasMes = (await matriculasCriadasDesde(academiaId, startOfMonth)) as MatriculaMesRow[]
+          receita = matriculasMes
+            .filter((m) => m.status === 'ATIVO' && m.valor_pago != null)
+            .reduce((sum, m) => sum + Number(m.valor_pago), 0)
+          vencimentos = matriculasMes.filter((m) => m.status === 'VENCIDO').length
+        } else {
+          const matriculasMes = (await matriculasCriadasDesde(academiaId, startOfMonth)) as MatriculaMesRow[]
+          vencimentos = matriculasMes.filter((m) => m.status === 'VENCIDO').length
+        }
 
         const recentData = await matriculasRecentes(academiaId, 5)
         const formattedActivities = (recentData ?? []).map((m: Record<string, unknown>) => {
@@ -100,18 +106,26 @@ export default function DashboardPage() {
     }
 
     void loadDashboard()
-  }, [authLoading, academiaId])
+  }, [authLoading, academiaId, isReceptionist])
 
-  const statItems = [
-    { label: 'Alunos', value: String(stats.totalAlunos) },
-    {
-      label: isReceptionist ? 'Faturamento (mês)' : 'Receita (mês)',
-      value: `R$ ${stats.receitaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-      accent: true,
-    },
-    { label: 'Fichas', value: String(stats.totalTreinos) },
-    { label: 'Vencidos (mês)', value: String(stats.vencimentosMes) },
-  ]
+  const statItems = (
+    isReceptionist
+      ? [
+          { label: 'Alunos', value: String(stats.totalAlunos) },
+          { label: 'Fichas', value: String(stats.totalTreinos) },
+          { label: 'Vencidos no mês', value: String(stats.vencimentosMes) },
+        ]
+      : [
+          { label: 'Alunos', value: String(stats.totalAlunos) },
+          {
+            label: 'Receita no mês',
+            value: `R$ ${stats.receitaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+            accent: true as const,
+          },
+          { label: 'Fichas', value: String(stats.totalTreinos) },
+          { label: 'Vencidos no mês', value: String(stats.vencimentosMes) },
+        ]
+  ) as { label: string; value: string; accent?: boolean }[]
 
   return (
     <div className="min-h-0 p-5 sm:p-8">
@@ -123,16 +137,18 @@ export default function DashboardPage() {
               Olá, {profile?.nome_completo?.split(' ')[0] || 'equipe'}
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              className="h-9 bg-[#F2B705] px-4 font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
-              onClick={() => router.push('/planos')}
-            >
-              Financeiro
-            </Button>
-          </div>
+          {!isReceptionist ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                className="h-9 bg-[#F2B705] px-4 font-semibold text-[#0D0D0D] hover:bg-[#BF9004]"
+                onClick={() => router.push('/planos')}
+              >
+                Financeiro
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         {loadError && !loading && (
@@ -148,7 +164,11 @@ export default function DashboardPage() {
         ) : (
           <>
             <section className="rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60">
-              <div className="grid grid-cols-2 divide-x divide-[#585759]/20 md:grid-cols-4">
+              <div
+                className={`grid grid-cols-2 divide-x divide-[#585759]/20 ${
+                  isReceptionist ? 'md:grid-cols-3' : 'md:grid-cols-4'
+                }`}
+              >
                 {statItems.map((item) => (
                   <div key={item.label} className="px-4 py-5 sm:px-5">
                     <p className="text-[11px] font-medium uppercase tracking-wider text-[#585759]">{item.label}</p>
@@ -174,7 +194,9 @@ export default function DashboardPage() {
                 </section>
               ) : (
                 <section className="flex min-h-[220px] flex-col justify-center rounded-xl border border-[#585759]/25 bg-[#0D0D0D]/60 px-5 py-8 text-center lg:col-span-3">
-                  <p className="text-sm text-[#585759]">Gráfico financeiro disponível apenas para administradores.</p>
+                  <p className="text-sm text-[#585759]">
+                    Resumo financeiro e gráficos ficam disponíveis apenas para o administrador da academia.
+                  </p>
                 </section>
               )}
 
@@ -190,9 +212,11 @@ export default function DashboardPage() {
                         <span className="truncate text-xs text-[#585759]">{a.plano_nome}</span>
                         <span className="flex justify-between text-xs text-[#585759]">
                           <span>{new Date(a.data).toLocaleDateString('pt-BR')}</span>
-                          <span className="tabular-nums text-[#A6A6A6]">
-                            R$ {a.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </span>
+                          {!isReceptionist ? (
+                            <span className="tabular-nums text-[#A6A6A6]">
+                              R$ {a.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          ) : null}
                         </span>
                       </li>
                     ))

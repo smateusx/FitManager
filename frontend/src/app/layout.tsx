@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'FitManager',
-  description: 'Sistema de Gestão para Academias',
+  description: 'Sistema de gestão para academias',
 }
 
 export default function RootLayout({

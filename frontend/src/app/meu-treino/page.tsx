@@ -10,7 +10,9 @@ import {
   insertRegistroCarga,
   listFichasByAluno,
   listMatriculasByAluno,
+  getAcademia,
 } from '@/lib/firestore'
+import { normalizeWhatsAppDigits, whatsAppChatUrl } from '@/lib/whatsapp-contact'
 import { 
   Dumbbell, 
   ChevronDown, 
@@ -26,6 +28,7 @@ import {
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
 import { ProfileAvatar } from '@/components/profile-avatar'
+import { TreinosPreProntosAluno } from '@/components/treinos-pre-prontos-aluno'
 
 type Exercicio = {
   id: string
@@ -60,6 +63,7 @@ export default function MeuTreinoPage() {
   const [matriculas, setMatriculas] = useState<
     Awaited<ReturnType<typeof listMatriculasByAluno>>
   >([])
+  const [academiaWaHref, setAcademiaWaHref] = useState<string | null>(null)
 
   const router = useRouter()
 
@@ -86,6 +90,17 @@ export default function MeuTreinoPage() {
       if (perfil) {
         setUserName(perfil.nome_completo || 'Aluno')
         setUserId(u.uid)
+        if (perfil.academia_id) {
+          const ac = await getAcademia(perfil.academia_id)
+          const raw = ac?.whatsapp_contato
+          if (raw?.replace(/\D/g, '')) {
+            setAcademiaWaHref(whatsAppChatUrl(normalizeWhatsAppDigits(raw)))
+          } else {
+            setAcademiaWaHref(null)
+          }
+        } else {
+          setAcademiaWaHref(null)
+        }
       }
 
       const fichasData = await listFichasByAluno(u.uid)
@@ -182,9 +197,25 @@ export default function MeuTreinoPage() {
         {/* Greeting */}
         <div className="mb-8">
           <p className="text-[#A6A6A6] text-sm uppercase tracking-widest font-semibold mb-1">Portal do Aluno</p>
-          <h1 className="text-3xl font-bold text-white">Olá, {userName.split(' ')[0]}! 👋</h1>
+          <h1 className="text-3xl font-bold text-white">Olá, {userName.split(' ')[0]}!</h1>
           <p className="text-[#A6A6A6] mt-1">Aqui estão suas informações e treinos.</p>
         </div>
+
+        {academiaWaHref ? (
+          <div className="mb-8 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-4 sm:px-5">
+            <p className="text-sm text-[#A6A6A6]">
+              Dúvidas sobre treino ou sobre a academia? Fale com a equipe pelo WhatsApp cadastrado pela academia.
+            </p>
+            <a
+              href={academiaWaHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#25D366]/20 hover:bg-[#128C7E]"
+            >
+              Abrir WhatsApp da academia
+            </a>
+          </div>
+        ) : null}
 
         {/* Tab Switcher */}
         <div className="flex p-1 bg-[#585759]/10 rounded-2xl mb-8 border border-[#585759]/20">
@@ -214,6 +245,8 @@ export default function MeuTreinoPage() {
 
         {activeTab === 'treinos' ? (
           <>
+            <TreinosPreProntosAluno />
+
             {fichas.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center gap-4 border border-dashed border-[#585759]/40 rounded-2xl">
                 <div className="p-5 bg-[#F2B705]/10 rounded-2xl">
@@ -221,12 +254,21 @@ export default function MeuTreinoPage() {
                 </div>
                 <p className="text-white font-semibold text-lg">Nenhuma ficha ainda</p>
                 <p className="text-[#A6A6A6] text-sm max-w-xs">
-                  Aguarde seu professor montar sua ficha de treino personalizada.
+                  Use os treinos prontos para iniciantes acima ou aguarde a academia montar sua ficha personalizada aqui.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {fichas.map((ficha) => {
+              <>
+                <div className="my-10 border-t border-[#585759]/25 pt-8">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-[#585759]">
+                    Fichas da academia
+                  </p>
+                  <p className="mt-1 text-sm text-[#A6A6A6]">
+                    Treinos montados pela equipe. Registre cargas e acompanhe a evolução nos exercícios.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  {fichas.map((ficha) => {
                   const isExpanded = expandedId === ficha.id
                   const exs = (ficha.exercicios ?? []).sort((a, b) => a.ordem - b.ordem)
                   return (
@@ -359,7 +401,8 @@ export default function MeuTreinoPage() {
                     </div>
                   )
                 })}
-              </div>
+                </div>
+              </>
             )}
           </>
         ) : (

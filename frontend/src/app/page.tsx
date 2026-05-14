@@ -3,7 +3,7 @@ import { Dumbbell, Users, ClipboardList, CreditCard } from 'lucide-react'
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0D0D0D] text-white">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0D0D0D] text-white [hyphens:none]">
       <header className="sticky top-0 z-20 border-b border-[#585759]/20 bg-[#0D0D0D]/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
@@ -33,10 +33,10 @@ export default function Home() {
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-14 sm:px-6 sm:py-20">
         <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-          Gestão da sua academia num só lugar.
+          Gestão da sua academia em um só lugar.
         </h1>
-        <p className="mt-4 max-w-xl text-[#A6A6A6] leading-relaxed">
-          Alunos, fichas de treino e mensalidades — menos papel e menos retrabalho na receção.
+        <p className="mt-4 max-w-xl leading-relaxed text-[#A6A6A6]">
+          Alunos, fichas de treino e mensalidades organizados no mesmo fluxo. Menos papel e menos retrabalho na recepção.
         </p>
 
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
