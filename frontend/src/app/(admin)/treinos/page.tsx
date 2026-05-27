@@ -19,11 +19,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
 import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
-import { FichaSemanalEditor, EXERCICIO_SEMANA_VAZIO } from '@/components/ficha-semanal-editor'
+import { FichaSemanalEditor } from '@/components/ficha-semanal-editor'
 import { FichaSemanalResumo, FichaSemanalView } from '@/components/ficha-semanal-view'
 import {
+  criarSemanaVazia,
   exerciciosParaSemana,
-  semanaComDiaInicial,
   semanaParaLinhasFirestore,
   type ExercicioComDia,
   type JsWeekday,
@@ -61,7 +61,7 @@ export default function TreinosPage() {
   const [nomeFicha, setNomeFicha] = useState('')
   const [objetivo, setObjetivo] = useState('')
   const [alunoSel, setAlunoSel] = useState('')
-  const [semana, setSemana] = useState<SemanaTreinoForm>(() => semanaComDiaInicial(EXERCICIO_SEMANA_VAZIO, 1))
+  const [semana, setSemana] = useState<SemanaTreinoForm>(() => criarSemanaVazia())
   const [diaAtivo, setDiaAtivo] = useState<JsWeekday>(1)
   const [saving, setSaving] = useState(false)
   const [editingFichaId, setEditingFichaId] = useState<string | null>(null)
@@ -189,7 +189,7 @@ export default function TreinosPage() {
     setNomeFicha('')
     setObjetivo('')
     setAlunoSel('')
-    setSemana(semanaComDiaInicial(EXERCICIO_SEMANA_VAZIO, 1))
+    setSemana(criarSemanaVazia())
     setDiaAtivo(1)
   }
 

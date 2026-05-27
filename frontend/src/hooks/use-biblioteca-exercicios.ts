@@ -12,6 +12,8 @@ import {
   type GrupoMuscular,
 } from '@/lib/catalogo-exercicios-musculo'
 
+type PersistResult = { ok: true } | { ok: false; erro: string }
+
 export function useBibliotecaExercicios(academiaId: string | null) {
   const [catalogo, setCatalogo] = useState<CatalogoExercicios>(() => cloneCatalogoPadrao())
   const [loading, setLoading] = useState(!!academiaId)
@@ -43,17 +45,25 @@ export function useBibliotecaExercicios(academiaId: string | null) {
   }, [academiaId])
 
   const persistir = useCallback(
-    async (proximo: CatalogoExercicios) => {
+    async (proximo: CatalogoExercicios): Promise<PersistResult> => {
+      if (!academiaId) {
+        return { ok: false, erro: 'Não foi possível identificar a academia. Recarregue a página.' }
+      }
+
+      const anterior = catalogo
       setCatalogo(proximo)
-      if (!academiaId) return
       setSaving(true)
       try {
         await saveBibliotecaCatalogoAcademia(academiaId, proximo)
+        return { ok: true }
+      } catch {
+        setCatalogo(anterior)
+        return { ok: false, erro: 'Erro ao salvar a biblioteca. Tente novamente.' }
       } finally {
         setSaving(false)
       }
     },
-    [academiaId]
+    [academiaId, catalogo]
   )
 
   const adicionarNaLista = useCallback(
@@ -70,7 +80,8 @@ export function useBibliotecaExercicios(academiaId: string | null) {
         ...catalogo,
         [grupo]: [...catalogo[grupo], { ...preset, nome }],
       }
-      await persistir(proximo)
+      const saved = await persistir(proximo)
+      if (!saved.ok) return { ok: false as const, erro: saved.erro }
       return { ok: true as const, nome }
     },
     [catalogo, persistir]
@@ -82,7 +93,8 @@ export function useBibliotecaExercicios(academiaId: string | null) {
         ...catalogo,
         [grupo]: catalogo[grupo].filter((ex) => ex.nome !== nome),
       }
-      await persistir(proximo)
+      const saved = await persistir(proximo)
+      if (!saved.ok) throw new Error(saved.erro)
       return nome
     },
     [catalogo, persistir]
@@ -104,7 +116,8 @@ export function useBibliotecaExercicios(academiaId: string | null) {
         ...catalogo,
         [grupo]: catalogo[grupo].map((ex) => (ex.nome === nomeAtual ? { ...preset, nome } : ex)),
       }
-      await persistir(proximo)
+      const saved = await persistir(proximo)
+      if (!saved.ok) return { ok: false as const, erro: saved.erro }
       return { ok: true as const, nome }
     },
     [catalogo, persistir]
