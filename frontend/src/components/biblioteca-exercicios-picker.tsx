@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Pencil, PenLine, Plus, Settings2, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inli
 import {
   exercicioExisteNoGrupo,
   GRUPOS_MUSCULARES,
+  normalizarNomeExercicio,
   presetParaForm,
   type CatalogoExercicios,
   type ExercicioPreset,
@@ -27,12 +28,23 @@ const PRESET_VAZIO: ExercicioPreset = {
 
 type BibliotecaExerciciosPickerProps = {
   biblioteca: ReturnType<typeof useBibliotecaExercicios>
+  exerciciosDoDia?: ExercicioSemanaForm[]
   onAdicionar: (exercicio: ExercicioSemanaForm) => void
   onAdicionarPersonalizado: () => void
 }
 
+function nomesExerciciosNoDia(exercicios: ExercicioSemanaForm[]): Set<string> {
+  const nomes = new Set<string>()
+  for (const ex of exercicios) {
+    const chave = normalizarNomeExercicio(ex.nome)
+    if (chave) nomes.add(chave)
+  }
+  return nomes
+}
+
 export function BibliotecaExerciciosPicker({
   biblioteca,
+  exerciciosDoDia = [],
   onAdicionar,
   onAdicionarPersonalizado,
 }: BibliotecaExerciciosPickerProps) {
@@ -55,8 +67,19 @@ export function BibliotecaExerciciosPicker({
   const [mostrarFormInclusao, setMostrarFormInclusao] = useState(false)
   const [incluindoNaLista, setIncluindoNaLista] = useState(false)
 
-  const lista = catalogo[grupoAtivo]
+  const listaCatalogo = catalogo[grupoAtivo]
+  const nomesNoDia = useMemo(() => nomesExerciciosNoDia(exerciciosDoDia), [exerciciosDoDia])
+  const lista = modoEdicao
+    ? listaCatalogo
+    : listaCatalogo.filter((preset) => !nomesNoDia.has(normalizarNomeExercicio(preset.nome)))
   const grupoLabel = GRUPOS_MUSCULARES.find((g) => g.id === grupoAtivo)?.label ?? 'Grupo'
+
+  function contagemGrupo(grupo: GrupoMuscular): number {
+    const total = catalogo[grupo].length
+    if (modoEdicao) return total
+    return catalogo[grupo].filter((preset) => !nomesNoDia.has(normalizarNomeExercicio(preset.nome)))
+      .length
+  }
   const nomeNovoTrim = novoPreset.nome.trim()
   const jaExisteNaLista = nomeNovoTrim.length > 0 && exercicioExisteNoGrupo(lista, nomeNovoTrim)
 
@@ -72,6 +95,10 @@ export function BibliotecaExerciciosPicker({
 
   function handleAdicionarAoDia(preset: ExercicioPreset) {
     if (modoEdicao) return
+    if (nomesNoDia.has(normalizarNomeExercicio(preset.nome))) {
+      mostrarFeedback('warning', `${preset.nome}, já está no dia de hoje.`)
+      return
+    }
     onAdicionar(presetParaForm(preset))
     setUltimoAdicionadoAoDia(preset.nome)
     mostrarFeedback('success', `${preset.nome}, adicionado com sucesso`)
@@ -207,7 +234,7 @@ export function BibliotecaExerciciosPicker({
                 }`}
               >
                 {grupo.label}
-                <span className="ml-1 opacity-70">({catalogo[grupo.id].length})</span>
+                <span className="ml-1 opacity-70">({contagemGrupo(grupo.id)})</span>
               </button>
             ))}
           </div>
@@ -215,7 +242,9 @@ export function BibliotecaExerciciosPicker({
           <div className="mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
             {lista.length === 0 ? (
               <p className="rounded-lg border border-dashed border-[#585759]/35 px-4 py-6 text-center text-sm text-[#585759]">
-                Nenhum exercício em {grupoLabel}. Use o formulário abaixo para incluir.
+                {!modoEdicao && listaCatalogo.length > 0
+                  ? `Todos os exercícios de ${grupoLabel} já foram adicionados a este dia.`
+                  : `Nenhum exercício em ${grupoLabel}. Use o formulário abaixo para incluir.`}
               </p>
             ) : (
               lista.map((preset) => {

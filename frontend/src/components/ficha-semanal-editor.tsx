@@ -70,7 +70,8 @@ export function FichaSemanalEditor({
   }
 
   function addExercicioDaBiblioteca(preset: ExercicioSemanaForm) {
-    const { lista } = inserirExercicioNoDia(exerciciosDia, preset)
+    const { lista, duplicado } = inserirExercicioNoDia(exerciciosDia, preset)
+    if (duplicado) return
     flushSync(() => {
       setDiaExercicios(lista)
     })
@@ -300,6 +301,7 @@ export function FichaSemanalEditor({
 
       <BibliotecaExerciciosPicker
         biblioteca={biblioteca}
+        exerciciosDoDia={exerciciosDia}
         onAdicionar={(ex) => addExercicioDaBiblioteca(ex)}
         onAdicionarPersonalizado={handleEscreverPersonalizado}
       />
