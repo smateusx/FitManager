@@ -107,8 +107,9 @@ export function normalizarCatalogo(raw: unknown): CatalogoExercicios | null {
         descanso: String(item.descanso ?? '60 s'),
       }))
       .filter((item) => item.nome.length > 0)
+    base[id] = deduplicarGrupo(base[id])
   }
-  return base
+  return deduplicarCatalogo(base)
 }
 
 export function presetParaForm(preset: ExercicioPreset): ExercicioSemanaForm {
@@ -122,7 +123,31 @@ export function presetParaForm(preset: ExercicioPreset): ExercicioSemanaForm {
 }
 
 export function normalizarNomeExercicio(nome: string): string {
-  return nome.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+  return nome
+    .trim()
+    .replace(/\s+/g, ' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+}
+
+export function deduplicarGrupo(lista: ExercicioPreset[]): ExercicioPreset[] {
+  const vistos = new Set<string>()
+  const resultado: ExercicioPreset[] = []
+  for (const ex of lista) {
+    const chave = normalizarNomeExercicio(ex.nome)
+    if (!chave || vistos.has(chave)) continue
+    vistos.add(chave)
+    resultado.push(ex)
+  }
+  return resultado
+}
+
+export function deduplicarCatalogo(catalogo: CatalogoExercicios): CatalogoExercicios {
+  return GRUPOS_MUSCULARES.reduce((acc, { id }) => {
+    acc[id] = deduplicarGrupo(catalogo[id] ?? [])
+    return acc
+  }, {} as CatalogoExercicios)
 }
 
 export function exercicioExisteNoGrupo(lista: ExercicioPreset[], nome: string): boolean {
