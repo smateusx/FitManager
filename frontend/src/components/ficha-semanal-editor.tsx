@@ -8,6 +8,7 @@ import {
   BibliotecaExerciciosPicker,
   PreencherDaBiblioteca,
 } from '@/components/biblioteca-exercicios-picker'
+import { useBibliotecaExercicios } from '@/hooks/use-biblioteca-exercicios'
 import {
   DIAS_SEMANA_TREINO,
   type ExercicioSemanaForm,
@@ -24,13 +25,22 @@ const BLANK: ExercicioSemanaForm = {
 }
 
 type FichaSemanalEditorProps = {
+  academiaId: string | null
   semana: SemanaTreinoForm
   diaAtivo: JsWeekday
   onDiaChange: (dia: JsWeekday) => void
   onSemanaChange: (semana: SemanaTreinoForm) => void
 }
 
-export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChange }: FichaSemanalEditorProps) {
+export function FichaSemanalEditor({
+  academiaId,
+  semana,
+  diaAtivo,
+  onDiaChange,
+  onSemanaChange,
+}: FichaSemanalEditorProps) {
+  const biblioteca = useBibliotecaExercicios(academiaId)
+  const { catalogo } = biblioteca
   const exerciciosDia = semana[diaAtivo]
 
   function setDiaExercicios(lista: ExercicioSemanaForm[]) {
@@ -133,6 +143,7 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
       </div>
 
       <BibliotecaExerciciosPicker
+        biblioteca={biblioteca}
         onAdicionar={(ex) => addExercicio(ex)}
         onAdicionarPersonalizado={() => addExercicio()}
       />
@@ -173,7 +184,10 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
                   </button>
                 </div>
 
-                <PreencherDaBiblioteca onPreencher={(preset) => preencherExercicio(i, preset)} />
+                <PreencherDaBiblioteca
+                  catalogo={catalogo}
+                  onPreencher={(preset) => preencherExercicio(i, preset)}
+                />
 
                 <div className="space-y-1">
                   <Label className="text-xs text-[#585759]">Nome do exercício</Label>
