@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Pencil, PenLine, Plus, Trash2 } from 'lucide-react'
+import { Check, Pencil, PenLine, Plus, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +39,7 @@ export function BibliotecaExerciciosPicker({
     biblioteca
 
   const [grupoAtivo, setGrupoAtivo] = useState<GrupoMuscular>('peito')
+  const [modoEdicao, setModoEdicao] = useState(false)
   const [feedback, setFeedback] = useState<{ variant: InlineFeedbackVariant; message: string } | null>(
     null
   )
@@ -65,6 +66,7 @@ export function BibliotecaExerciciosPicker({
   }
 
   function handleAdicionarAoDia(preset: ExercicioPreset) {
+    if (modoEdicao) return
     onAdicionar(presetParaForm(preset))
     setUltimoAdicionadoAoDia(preset.nome)
     mostrarFeedback('success', `${preset.nome}, adicionado com sucesso`)
@@ -111,19 +113,42 @@ export function BibliotecaExerciciosPicker({
         <div>
           <Label className="text-[#A6A6A6]">Biblioteca de exercícios</Label>
           <p className="mt-1 text-xs text-[#585759]">
-            Escolha o grupo, adicione ao dia ou gerencie a lista da academia (incluir e remover).
+            {modoEdicao
+              ? 'Modo edição: inclua, altere ou remova exercícios da lista da academia.'
+              : 'Escolha o grupo e clique em Adicionar ao dia, ou use Editar lista para gerenciar a biblioteca.'}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onAdicionarPersonalizado}
-          className="shrink-0 border-[#585759] text-[#F2B705] hover:bg-[#F2B705]/10"
-        >
-          <PenLine className="mr-1 h-3.5 w-3.5" />
-          Escrever personalizado
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={modoEdicao ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setModoEdicao((v) => !v)
+              setEditandoNome(null)
+            }}
+            className={
+              modoEdicao
+                ? 'bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]'
+                : 'border-[#585759] text-[#A6A6A6]'
+            }
+          >
+            <Settings2 className="mr-1 h-3.5 w-3.5" />
+            {modoEdicao ? 'Concluir edição' : 'Editar lista'}
+          </Button>
+          {!modoEdicao ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onAdicionarPersonalizado}
+              className="shrink-0 border-[#585759] text-[#F2B705] hover:bg-[#F2B705]/10"
+            >
+              <PenLine className="mr-1 h-3.5 w-3.5" />
+              Escrever personalizado
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {feedback ? (
@@ -171,7 +196,7 @@ export function BibliotecaExerciciosPicker({
                 const adicionadoAgora = ultimoAdicionadoAoDia === preset.nome
                 const editando = editandoNome === preset.nome
 
-                if (editando) {
+                if (modoEdicao && editando) {
                   return (
                     <div
                       key={preset.nome}
@@ -255,7 +280,8 @@ export function BibliotecaExerciciosPicker({
                         type="button"
                         size="sm"
                         onClick={() => handleAdicionarAoDia(preset)}
-                        className="h-8 shrink-0 bg-[#F2B705] px-2 text-[10px] font-bold text-[#0D0D0D] hover:bg-[#BF9004] sm:text-xs"
+                        disabled={modoEdicao}
+                        className="h-8 shrink-0 bg-[#F2B705] px-2 text-[10px] font-bold text-[#0D0D0D] hover:bg-[#BF9004] disabled:opacity-40 sm:text-xs"
                       >
                         {adicionadoAgora ? (
                           <Check className="mr-1 h-3.5 w-3.5" />
@@ -264,27 +290,31 @@ export function BibliotecaExerciciosPicker({
                         )}
                         Adicionar ao dia
                       </Button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditandoNome(preset.nome)
-                          setEditPreset({ ...preset })
-                        }}
-                        className="rounded p-1.5 text-[#585759] hover:bg-[#585759]/20 hover:text-[#F2B705]"
-                        aria-label={`Editar ${preset.nome} na lista`}
-                        title="Editar na lista"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRemoverTarget({ grupo: grupoAtivo, nome: preset.nome })}
-                        className="rounded p-1.5 text-[#585759] hover:bg-red-500/10 hover:text-red-400"
-                        aria-label={`Remover ${preset.nome} da lista`}
-                        title="Remover da lista"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {modoEdicao ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditandoNome(preset.nome)
+                              setEditPreset({ ...preset })
+                            }}
+                            className="rounded p-1.5 text-[#585759] hover:bg-[#585759]/20 hover:text-[#F2B705]"
+                            aria-label={`Editar ${preset.nome} na lista`}
+                            title="Editar na lista"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRemoverTarget({ grupo: grupoAtivo, nome: preset.nome })}
+                            className="rounded p-1.5 text-[#585759] hover:bg-red-500/10 hover:text-red-400"
+                            aria-label={`Remover ${preset.nome} da lista`}
+                            title="Remover da lista"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 )
@@ -292,52 +322,54 @@ export function BibliotecaExerciciosPicker({
             )}
           </div>
 
-          <form
-            onSubmit={handleIncluirNaLista}
-            className="mt-4 space-y-3 rounded-xl border border-dashed border-[#F2B705]/30 bg-[#F2B705]/5 p-3"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
-              Adicionar exercício à lista de {grupoLabel}
-            </p>
-            <Input
-              value={novoPreset.nome}
-              onChange={(e) => setNovoPreset((p) => ({ ...p, nome: e.target.value }))}
-              placeholder="Nome do exercício"
-              required
-              className="border-[#585759] bg-[#0D0D0D] text-white"
-            />
-            <div className="grid grid-cols-3 gap-2">
-              <Input
-                type="number"
-                min={1}
-                value={novoPreset.series}
-                onChange={(e) => setNovoPreset((p) => ({ ...p, series: Number(e.target.value) }))}
-                className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
-                aria-label="Séries"
-              />
-              <Input
-                value={novoPreset.repeticoes}
-                onChange={(e) => setNovoPreset((p) => ({ ...p, repeticoes: e.target.value }))}
-                placeholder="Reps"
-                className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
-              />
-              <Input
-                value={novoPreset.descanso}
-                onChange={(e) => setNovoPreset((p) => ({ ...p, descanso: e.target.value }))}
-                placeholder="Descanso"
-                className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
-              />
-            </div>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={saving || !novoPreset.nome.trim()}
-              className="bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]"
+          {modoEdicao ? (
+            <form
+              onSubmit={handleIncluirNaLista}
+              className="mt-4 space-y-3 rounded-xl border border-dashed border-[#F2B705]/30 bg-[#F2B705]/5 p-3"
             >
-              <Plus className="mr-1 h-4 w-4" />
-              Adicionar à lista
-            </Button>
-          </form>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
+                Adicionar exercício à lista de {grupoLabel}
+              </p>
+              <Input
+                value={novoPreset.nome}
+                onChange={(e) => setNovoPreset((p) => ({ ...p, nome: e.target.value }))}
+                placeholder="Nome do exercício"
+                required
+                className="border-[#585759] bg-[#0D0D0D] text-white"
+              />
+              <div className="grid grid-cols-3 gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={novoPreset.series}
+                  onChange={(e) => setNovoPreset((p) => ({ ...p, series: Number(e.target.value) }))}
+                  className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
+                  aria-label="Séries"
+                />
+                <Input
+                  value={novoPreset.repeticoes}
+                  onChange={(e) => setNovoPreset((p) => ({ ...p, repeticoes: e.target.value }))}
+                  placeholder="Reps"
+                  className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
+                />
+                <Input
+                  value={novoPreset.descanso}
+                  onChange={(e) => setNovoPreset((p) => ({ ...p, descanso: e.target.value }))}
+                  placeholder="Descanso"
+                  className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
+                />
+              </div>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={saving || !novoPreset.nome.trim()}
+                className="bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Adicionar à lista
+              </Button>
+            </form>
+          ) : null}
         </>
       )}
 

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { Copy, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,47 +48,50 @@ export function FichaSemanalEditor({
   const { catalogo } = biblioteca
   const exerciciosDia = semana[diaAtivo]
   const secaoExerciciosRef = useRef<HTMLDivElement>(null)
-  const [focusIndice, setFocusIndice] = useState<number | null>(null)
 
   function setDiaExercicios(lista: ExercicioSemanaForm[]) {
     onSemanaChange({ ...semana, [diaAtivo]: lista })
   }
 
   function scrollParaExercicios() {
-    requestAnimationFrame(() => {
-      secaoExerciciosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
+    secaoExerciciosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  function focarLinhaExercicio(indice: number) {
+    scrollParaExercicios()
+    const card = document.getElementById(`exercicio-card-${diaAtivo}-${indice}`)
+    const input =
+      card?.querySelector<HTMLInputElement>('input[data-slot="input"]') ??
+      card?.querySelector<HTMLInputElement>('input')
+    if (input) {
+      input.focus()
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
   }
 
   function addExercicioDaBiblioteca(preset: ExercicioSemanaForm) {
     const { lista } = inserirExercicioNoDia(exerciciosDia, preset)
-    setDiaExercicios(lista)
+    flushSync(() => {
+      setDiaExercicios(lista)
+    })
     scrollParaExercicios()
   }
 
   function handleEscreverPersonalizado() {
     const { lista, indice } = abrirLinhaPersonalizada(exerciciosDia, BLANK)
-    setDiaExercicios(lista)
-    setFocusIndice(indice)
-    scrollParaExercicios()
+    flushSync(() => {
+      setDiaExercicios(lista)
+    })
+    focarLinhaExercicio(indice)
   }
 
   function addExercicioPersonalizadoExtra() {
     const { lista, indice } = abrirLinhaPersonalizada(exerciciosDia, BLANK)
-    setDiaExercicios(lista)
-    setFocusIndice(indice)
+    flushSync(() => {
+      setDiaExercicios(lista)
+    })
+    focarLinhaExercicio(indice)
   }
-
-  useEffect(() => {
-    if (focusIndice === null) return
-    const t = window.setTimeout(() => {
-      const el = document.getElementById(`exercicio-nome-${diaAtivo}-${focusIndice}`)
-      el?.focus()
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setFocusIndice(null)
-    }, 150)
-    return () => window.clearTimeout(t)
-  }, [focusIndice, diaAtivo, exerciciosDia.length])
 
   function removeExercicio(i: number) {
     setDiaExercicios(exerciciosDia.filter((_, idx) => idx !== i))
@@ -216,6 +220,7 @@ export function FichaSemanalEditor({
             {exerciciosDia.map((ex, i) => (
               <div
                 key={`${diaAtivo}-${i}`}
+                id={`exercicio-card-${diaAtivo}-${i}`}
                 className="space-y-3 rounded-xl border border-[#585759]/40 bg-[#585759]/5 p-4"
               >
                 <div className="flex items-center justify-between">
