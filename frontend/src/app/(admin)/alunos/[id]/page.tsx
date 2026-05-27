@@ -15,6 +15,10 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EvolutionChart } from '@/components/evolution-chart'
+import { TreinosPreProntosAluno } from '@/components/treinos-pre-prontos-aluno'
+import { TreinoContextBanner } from '@/components/treino-context-banner'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
+import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 import {
   User as UserIcon,
   Dumbbell,
@@ -89,6 +93,12 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
   const [renewDate, setRenewDate] = useState('')
   const [renewValor, setRenewValor] = useState('')
   const [isRenewing, setIsRenewing] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingAluno, setDeletingAluno] = useState(false)
+  const [pageFeedback, setPageFeedback] = useState<{
+    variant: InlineFeedbackVariant
+    message: string
+  } | null>(null)
   
   const { loading: authLoading, isAdmin } = useAuth()
   const router = useRouter()
@@ -168,10 +178,13 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
       setShowRenewModal(false)
       const updatedMatriculas = await listMatriculasByAluno(alunoId)
       setMatriculas((updatedMatriculas as unknown as Matricula[]) ?? [])
-      alert('Matrícula renovada com sucesso!')
+      setPageFeedback({ variant: 'success', message: 'Matrícula renovada com sucesso.' })
     } catch (err) {
       console.error('Erro ao renovar:', err)
-      alert('Erro ao processar renovação.')
+      setPageFeedback({
+        variant: 'error',
+        message: 'Não foi possível renovar a matrícula. Verifique os dados e tente novamente.',
+      })
     } finally {
       setIsRenewing(false)
     }
@@ -179,15 +192,19 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleDeleteAluno = async () => {
     if (!isAdmin) return
-    if (!confirm('TEM CERTEZA? Isso excluirá permanentemente o aluno, suas matrículas e treinos.')) return
-    
+    setDeletingAluno(true)
     try {
       await deleteAlunoData(alunoId)
-      alert('Aluno excluído com sucesso.')
       router.push('/alunos')
     } catch (err) {
       console.error('Erro ao excluir:', err)
-      alert('Erro ao excluir aluno.')
+      setDeleteDialogOpen(false)
+      setPageFeedback({
+        variant: 'error',
+        message: 'Não foi possível excluir o aluno. Tente novamente em instantes.',
+      })
+    } finally {
+      setDeletingAluno(false)
     }
   }
 
@@ -238,7 +255,7 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
               <Button 
                 variant="outline"
                 className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 font-bold"
-                onClick={handleDeleteAluno}
+                onClick={() => setDeleteDialogOpen(true)}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir
@@ -298,6 +315,16 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* Tab Content */}
         <div className="mt-6">
+          {pageFeedback ? (
+            <InlineFeedback
+              variant={pageFeedback.variant}
+              message={pageFeedback.message}
+              onDismiss={() => setPageFeedback(null)}
+              autoDismissMs={pageFeedback.variant === 'success' ? 4000 : undefined}
+              className="mb-6"
+            />
+          ) : null}
+
           {activeTab === 'perfil' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <Card className="bg-[#0D0D0D] border-[#585759]/50">
@@ -356,57 +383,71 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
           )}
 
           {activeTab === 'treinos' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <TreinosPreProntosAluno context="admin" />
+
               {fichas.length === 0 ? (
-                <div className="text-center py-16 border border-dashed border-[#585759]/30 rounded-2xl">
-                  <Dumbbell className="w-10 h-10 text-[#585759] mx-auto mb-3" />
-                  <p className="text-[#A6A6A6]">Este aluno ainda não possui fichas de treino.</p>
-                  <Button 
-                    variant="link" 
-                    className="text-[#F2B705] mt-2"
+                <div className="rounded-2xl border border-dashed border-[#585759]/30 py-12 text-center">
+                  <Dumbbell className="mx-auto mb-3 h-10 w-10 text-[#585759]" />
+                  <p className="text-[#A6A6A6]">
+                    Este aluno ainda não possui fichas oficiais cadastradas pela academia.
+                  </p>
+                  <Button
+                    variant="link"
+                    className="mt-2 text-[#F2B705]"
                     onClick={() => router.push('/treinos')}
                   >
                     Ir para Gestão de Treinos
                   </Button>
                 </div>
               ) : (
-                fichas.map((ficha) => (
-                  <div key={ficha.id} className="border border-[#585759]/40 rounded-xl overflow-hidden bg-[#0D0D0D]/40">
-                    <div className="p-4 bg-[#585759]/10 flex items-center justify-between border-b border-[#585759]/20">
-                      <div>
-                        <h4 className="text-white font-bold">{ficha.nome}</h4>
-                        <p className="text-[#A6A6A6] text-xs">{ficha.objetivo || 'Sem objetivo definido'}</p>
+                <>
+                  <TreinoContextBanner variant="oficial" />
+                  <div className="space-y-4">
+                    {fichas.map((ficha) => (
+                      <div
+                        key={ficha.id}
+                        className="overflow-hidden rounded-xl border border-[#585759]/40 bg-[#0D0D0D]/40"
+                      >
+                        <div className="flex items-center justify-between border-b border-[#585759]/20 bg-[#585759]/10 p-4">
+                          <div>
+                            <h4 className="font-bold text-white">{ficha.nome}</h4>
+                            <p className="text-xs text-[#A6A6A6]">{ficha.objetivo || 'Sem objetivo definido'}</p>
+                          </div>
+                          <span className="text-xs text-[#585759]">
+                            Criada em {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto p-4">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-[10px] uppercase tracking-widest text-[#585759]">
+                                <th className="pb-3 pr-4">Exercício</th>
+                                <th className="px-2 pb-3 text-center">Séries</th>
+                                <th className="px-2 pb-3 text-center">Reps</th>
+                                <th className="px-2 pb-3 text-center">Carga</th>
+                                <th className="px-2 pb-3 text-center">Rest</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#585759]/10">
+                              {ficha.exercicios.map((ex, i) => (
+                                <tr key={i} className="text-[#A6A6A6]">
+                                  <td className="py-2.5 pr-4 font-medium text-white">{ex.nome}</td>
+                                  <td className="px-2 py-2.5 text-center">{ex.series}</td>
+                                  <td className="px-2 py-2.5 text-center">{ex.repeticoes}</td>
+                                  <td className="px-2 py-2.5 text-center font-bold text-[#F2B705]">
+                                    {ex.carga || 'Sem registro'}
+                                  </td>
+                                  <td className="px-2 py-2.5 text-center text-xs">{ex.descanso}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                      <span className="text-[#585759] text-xs">
-                        Criada em {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
-                      </span>
-                    </div>
-                    <div className="p-4 overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-[#585759] uppercase text-[10px] tracking-widest text-left">
-                            <th className="pb-3 pr-4">Exercício</th>
-                            <th className="pb-3 px-2 text-center">Séries</th>
-                            <th className="pb-3 px-2 text-center">Reps</th>
-                            <th className="pb-3 px-2 text-center">Carga</th>
-                            <th className="pb-3 px-2 text-center">Rest</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#585759]/10">
-                          {ficha.exercicios.map((ex, i) => (
-                            <tr key={i} className="text-[#A6A6A6]">
-                              <td className="py-2.5 pr-4 text-white font-medium">{ex.nome}</td>
-                              <td className="py-2.5 px-2 text-center">{ex.series}</td>
-                              <td className="py-2.5 px-2 text-center">{ex.repeticoes}</td>
-                              <td className="py-2.5 px-2 text-center font-bold text-[#F2B705]">{ex.carga || '—'}</td>
-                              <td className="py-2.5 px-2 text-center text-xs">{ex.descanso}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    ))}
                   </div>
-                ))
+                </>
               )}
             </div>
           )}
@@ -594,6 +635,30 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       )}
+
+      <ConfirmActionDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Excluir aluno permanentemente?"
+        description={
+          <>
+            <p>
+              Você está prestes a excluir <strong className="text-white">{aluno?.nome_completo || 'este aluno'}</strong>.
+              Esta ação não pode ser desfeita.
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-[#A6A6A6]">
+              <li>Perfil e acesso do aluno</li>
+              <li>Matrículas e histórico financeiro</li>
+              <li>Fichas de treino e registros de carga</li>
+            </ul>
+          </>
+        }
+        confirmLabel="Excluir aluno"
+        cancelLabel="Manter aluno"
+        destructive
+        loading={deletingAluno}
+        onConfirm={handleDeleteAluno}
+      />
     </div>
   )
 }

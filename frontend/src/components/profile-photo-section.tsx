@@ -7,6 +7,7 @@ import { getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase'
 import { setPerfil } from '@/lib/firestore'
 import { ProfileAvatar } from '@/components/profile-avatar'
 import { Button } from '@/components/ui/button'
+import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 
 const MAX_BYTES = 2 * 1024 * 1024
@@ -21,20 +22,24 @@ type Props = {
 export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
+  const [feedback, setFeedback] = useState<{ variant: InlineFeedbackVariant; message: string } | null>(
+    null
+  )
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      alert('Escolha uma imagem (JPG, PNG ou WebP).')
+      setFeedback({ variant: 'warning', message: 'Escolha uma imagem JPG, PNG ou WebP.' })
       return
     }
     if (file.size > MAX_BYTES) {
-      alert('Use uma imagem de até 2 MB.')
+      setFeedback({ variant: 'warning', message: 'Use uma imagem de até 2 MB.' })
       return
     }
     setBusy(true)
+    setFeedback(null)
     try {
       const auth = getFirebaseAuth()
       const u = auth.currentUser
@@ -47,11 +52,14 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
       await setPerfil(u.uid, { foto_url: url })
       await updateProfile(u, { photoURL: url })
       onChange(url)
+      setFeedback({ variant: 'success', message: 'Foto atualizada com sucesso.' })
     } catch (err) {
       console.error(err)
-      alert(
-        'Não foi possível enviar a foto. Ative o Firebase Storage no console e publique as regras (firebase/storage.rules).'
-      )
+      setFeedback({
+        variant: 'error',
+        message:
+          'Não foi possível enviar a foto. Verifique o Firebase Storage e tente novamente.',
+      })
     } finally {
       setBusy(false)
     }
@@ -59,6 +67,7 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
 
   async function removePhoto() {
     setBusy(true)
+    setFeedback(null)
     try {
       const auth = getFirebaseAuth()
       const u = auth.currentUser
@@ -66,9 +75,10 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
       await setPerfil(u.uid, { foto_url: null })
       await updateProfile(u, { photoURL: null })
       onChange(null)
+      setFeedback({ variant: 'success', message: 'Foto removida.' })
     } catch (err) {
       console.error(err)
-      alert('Erro ao remover foto.')
+      setFeedback({ variant: 'error', message: 'Não foi possível remover a foto. Tente novamente.' })
     } finally {
       setBusy(false)
     }
@@ -121,6 +131,15 @@ export function ProfilePhotoSection({ userId, displayName, fotoUrl, onChange }: 
         ) : null}
       </div>
       <p className="max-w-[14rem] text-center text-xs text-[#585759]">JPG, PNG ou WebP · até 2 MB</p>
+      {feedback ? (
+        <InlineFeedback
+          variant={feedback.variant}
+          message={feedback.message}
+          onDismiss={() => setFeedback(null)}
+          autoDismissMs={feedback.variant === 'success' ? 3000 : undefined}
+          className="w-full max-w-sm"
+        />
+      ) : null}
     </div>
   )
 }

@@ -26,6 +26,9 @@ import {
 import { EvolutionChart } from '@/components/evolution-chart'
 import { Button } from '@/components/ui/button'
 import { ProfileAvatar } from '@/components/profile-avatar'
+import { TreinosPreProntosAluno } from '@/components/treinos-pre-prontos-aluno'
+import { TreinoContextBanner } from '@/components/treino-context-banner'
+import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 
 type Exercicio = {
   id: string
@@ -61,6 +64,9 @@ export default function MeuTreinoPage() {
   const [matriculas, setMatriculas] = useState<
     Awaited<ReturnType<typeof listMatriculasByAluno>>
   >([])
+  const [feedback, setFeedback] = useState<{ variant: InlineFeedbackVariant; message: string } | null>(
+    null
+  )
 
   const router = useRouter()
 
@@ -122,11 +128,14 @@ export default function MeuTreinoPage() {
       setRegisteringId(null)
       setCargaValue('')
       setRepsValue('')
-      // Abrir o gráfico para mostrar o novo ponto
       setShowingChartId(ex.id)
+      setFeedback({ variant: 'success', message: 'Carga registrada com sucesso.' })
     } catch (err) {
       console.error('Erro ao salvar carga:', err)
-      alert('Erro ao salvar registro de carga.')
+      setFeedback({
+        variant: 'error',
+        message: 'Não foi possível salvar o registro. Verifique os valores e tente novamente.',
+      })
     } finally {
       setIsSaving(false)
     }
@@ -220,19 +229,34 @@ export default function MeuTreinoPage() {
 
         {activeTab === 'treinos' ? (
           <>
+            {feedback ? (
+              <InlineFeedback
+                variant={feedback.variant}
+                message={feedback.message}
+                onDismiss={() => setFeedback(null)}
+                autoDismissMs={feedback.variant === 'success' ? 4000 : undefined}
+                className="mb-6"
+              />
+            ) : null}
+
+            <TreinosPreProntosAluno />
+
             {fichas.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center gap-4 border border-dashed border-[#585759]/40 rounded-2xl">
-                <div className="p-5 bg-[#F2B705]/10 rounded-2xl">
-                  <Dumbbell className="w-10 h-10 text-[#F2B705]" />
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-[#585759]/40 py-16 text-center">
+                <div className="rounded-2xl bg-[#F2B705]/10 p-5">
+                  <Dumbbell className="h-10 w-10 text-[#F2B705]" />
                 </div>
-                <p className="text-white font-semibold text-lg">Nenhuma ficha ainda</p>
-                <p className="text-[#A6A6A6] text-sm max-w-xs">
-                  Aguarde seu professor montar sua ficha de treino personalizada.
+                <p className="text-lg font-semibold text-white">Nenhuma ficha oficial ainda</p>
+                <p className="max-w-xs text-sm text-[#A6A6A6]">
+                  Enquanto isso, use o treino sugerido acima. Quando a academia cadastrar sua ficha, ela aparecerá aqui
+                  com registro de carga e evolução.
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {fichas.map((ficha) => {
+              <>
+                <div className="mt-10 space-y-4">
+                  <TreinoContextBanner variant="oficial" />
+                  {fichas.map((ficha) => {
                   const isExpanded = expandedId === ficha.id
                   const exs = (ficha.exercicios ?? []).sort((a, b) => a.ordem - b.ordem)
                   return (
@@ -365,7 +389,8 @@ export default function MeuTreinoPage() {
                     </div>
                   )
                 })}
-              </div>
+                </div>
+              </>
             )}
           </>
         ) : (

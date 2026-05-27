@@ -15,6 +15,8 @@ import { Dumbbell, Plus, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
+import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 import { useAuth } from '@/hooks/use-auth'
 
 type Exercicio = {
@@ -58,6 +60,16 @@ export default function TreinosPage() {
   const [alunoSel, setAlunoSel] = useState('')
   const [exercicios, setExercicios] = useState<Exercicio[]>([{ ...BLANK_EXERCICIO }])
   const [saving, setSaving] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    nome: string
+    aluno: string
+  } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [pageFeedback, setPageFeedback] = useState<{
+    variant: InlineFeedbackVariant
+    message: string
+  } | null>(null)
 
   const router = useRouter()
 
@@ -133,11 +145,23 @@ export default function TreinosPage() {
     fetchAll()
   }
 
-  const handleDelete = async (id: string) => {
-    if (isReceptionist) return
-    if (!confirm('Tem certeza que deseja excluir esta ficha?')) return
-    await deleteFicha(id)
-    fetchAll()
+  const handleDelete = async () => {
+    if (isReceptionist || !deleteTarget) return
+    setDeleting(true)
+    try {
+      await deleteFicha(deleteTarget.id)
+      setDeleteTarget(null)
+      setPageFeedback({ variant: 'success', message: 'Ficha excluída com sucesso.' })
+      await fetchAll()
+    } catch (err) {
+      console.error(err)
+      setPageFeedback({
+        variant: 'error',
+        message: 'Não foi possível excluir a ficha. Tente novamente.',
+      })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const resetModal = () => {
@@ -164,6 +188,15 @@ export default function TreinosPage() {
         </header>
 
         <main className="mt-8 space-y-4">
+          {pageFeedback ? (
+            <InlineFeedback
+              variant={pageFeedback.variant}
+              message={pageFeedback.message}
+              onDismiss={() => setPageFeedback(null)}
+              autoDismissMs={pageFeedback.variant === 'success' ? 4000 : undefined}
+            />
+          ) : null}
+
           {loading ? (
             <div className="flex justify-center py-16">
               <div className="w-10 h-10 border-4 border-[#585759] border-t-[#F2B705] rounded-full animate-spin" />
@@ -215,7 +248,11 @@ export default function TreinosPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleDelete(ficha.id)
+                            setDeleteTarget({
+                              id: ficha.id,
+                              nome: ficha.nome,
+                              aluno: ficha.perfis?.nome_completo || 'Aluno',
+                            })
                           }}
                           className="rounded-lg p-1.5 text-[#585759] transition-colors hover:bg-red-500/10 hover:text-red-500"
                         >
@@ -368,6 +405,33 @@ export default function TreinosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmActionDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null)
+        }}
+        title="Excluir ficha de treino?"
+        description={
+          deleteTarget ? (
+            <>
+              <p>
+                A ficha <strong className="text-white">{deleteTarget.nome}</strong> do aluno{' '}
+                <strong className="text-white">{deleteTarget.aluno}</strong> será removida junto com todos os
+                exercícios cadastrados nela.
+              </p>
+              <p className="mt-2">Esta ação não pode ser desfeita.</p>
+            </>
+          ) : (
+            'Confirme a exclusão da ficha selecionada.'
+          )
+        }
+        confirmLabel="Excluir ficha"
+        cancelLabel="Manter ficha"
+        destructive
+        loading={deleting}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }
