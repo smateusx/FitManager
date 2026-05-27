@@ -11,6 +11,7 @@ import {
 import { useBibliotecaExercicios } from '@/hooks/use-biblioteca-exercicios'
 import {
   DIAS_SEMANA_TREINO,
+  isExercicioSemanaVazio,
   type ExercicioSemanaForm,
   type JsWeekday,
   type SemanaTreinoForm,
@@ -48,7 +49,17 @@ export function FichaSemanalEditor({
   }
 
   function addExercicio(preset?: ExercicioSemanaForm) {
-    setDiaExercicios([...exerciciosDia, preset ? { ...preset } : { ...BLANK }])
+    const novo = preset ? { ...preset } : { ...BLANK }
+
+    if (preset) {
+      const idxVazio = exerciciosDia.findIndex(isExercicioSemanaVazio)
+      if (idxVazio >= 0) {
+        setDiaExercicios(exerciciosDia.map((ex, idx) => (idx === idxVazio ? novo : ex)))
+        return
+      }
+    }
+
+    setDiaExercicios([...exerciciosDia, novo])
   }
 
   function removeExercicio(i: number) {
@@ -63,7 +74,9 @@ export function FichaSemanalEditor({
 
   function preencherExercicio(i: number, preset: ExercicioSemanaForm) {
     setDiaExercicios(
-      exerciciosDia.map((ex, idx) => (idx === i ? { ...preset, carga: ex.carga || preset.carga } : ex))
+      exerciciosDia.map((ex, idx) =>
+        idx === i ? { ...preset, carga: ex.carga || preset.carga } : ex
+      )
     )
   }
 

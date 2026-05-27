@@ -45,6 +45,10 @@ export type ExercicioComDia = {
 
 export type ExercicioSemanaForm = Omit<ExercicioComDia, 'id' | 'ordem' | 'dia_semana'>
 
+export function isExercicioSemanaVazio(ex: ExercicioSemanaForm): boolean {
+  return !ex.nome.trim()
+}
+
 export type SemanaTreinoForm = Record<JsWeekday, ExercicioSemanaForm[]>
 
 export function criarSemanaVazia(): SemanaTreinoForm {
