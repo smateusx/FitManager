@@ -1,3 +1,5 @@
+import { normalizarNomeExercicio } from '@/lib/catalogo-exercicios-musculo'
+
 /** 0 = domingo … 6 = sábado (mesmo padrão de Date.getDay()) */
 export type JsWeekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
@@ -49,11 +51,26 @@ export function isExercicioSemanaVazio(ex: ExercicioSemanaForm): boolean {
   return !ex.nome.trim()
 }
 
+export function exercicioJaEstaNoDia(lista: ExercicioSemanaForm[], nome: string): boolean {
+  const alvo = normalizarNomeExercicio(nome)
+  if (!alvo) return false
+  return lista.some(
+    (ex) => !isExercicioSemanaVazio(ex) && normalizarNomeExercicio(ex.nome) === alvo
+  )
+}
+
 /** Substitui o primeiro slot vazio; senão adiciona ao final. Remove outros vazios ao preencher da biblioteca. */
 export function inserirExercicioNoDia(
   lista: ExercicioSemanaForm[],
   exercicio: ExercicioSemanaForm
-): { lista: ExercicioSemanaForm[]; indice: number } {
+): { lista: ExercicioSemanaForm[]; indice: number; duplicado?: boolean } {
+  if (!isExercicioSemanaVazio(exercicio) && exercicioJaEstaNoDia(lista, exercicio.nome)) {
+    const indice = lista.findIndex(
+      (ex) => normalizarNomeExercicio(ex.nome) === normalizarNomeExercicio(exercicio.nome)
+    )
+    return { lista, indice: indice >= 0 ? indice : 0, duplicado: true }
+  }
+
   const idxVazio = lista.findIndex(isExercicioSemanaVazio)
 
   if (idxVazio >= 0) {
