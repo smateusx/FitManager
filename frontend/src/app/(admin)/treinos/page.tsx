@@ -370,6 +370,7 @@ export default function TreinosPage() {
                 </div>
 
                 <FichaSemanalEditor
+                  academiaId={academiaId}
                   semana={semana}
                   diaAtivo={diaAtivo}
                   onDiaChange={setDiaAtivo}

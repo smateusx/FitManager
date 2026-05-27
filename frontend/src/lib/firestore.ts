@@ -16,6 +16,11 @@ import {
   where,
 } from 'firebase/firestore'
 import { getDb } from '@/lib/firebase'
+import {
+  cloneCatalogoPadrao,
+  normalizarCatalogo,
+  type CatalogoExercicios,
+} from '@/lib/catalogo-exercicios-musculo'
 
 export type Role = 'ADMIN' | 'RECEPCIONISTA' | 'ALUNO'
 
@@ -485,6 +490,24 @@ export async function replaceExerciciosFicha(
     ficha_id: fichaId,
   }))
   await insertExercicios(exRows)
+}
+
+export async function getBibliotecaCatalogoAcademia(academiaId: string) {
+  const snap = await getDoc(doc(getDb(), 'biblioteca_exercicios', academiaId))
+  if (!snap.exists()) return cloneCatalogoPadrao()
+  const normalizado = normalizarCatalogo(snap.data().catalogo)
+  return normalizado ?? cloneCatalogoPadrao()
+}
+
+export async function saveBibliotecaCatalogoAcademia(
+  academiaId: string,
+  catalogo: CatalogoExercicios
+) {
+  await setDoc(
+    doc(getDb(), 'biblioteca_exercicios', academiaId),
+    { catalogo, updated_at: serverTimestamp() },
+    { merge: true }
+  )
 }
 
 export async function insertRegistroCarga(data: Record<string, unknown>) {
