@@ -10,7 +10,8 @@ import { PasswordSessionAfterChange, type PasswordSessionMode } from '@/componen
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Shield, Smartphone, User, Lock, Save, Loader2, CheckCircle2 } from 'lucide-react'
+import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
+import { Shield, Smartphone, User, Lock, Save, Loader2 } from 'lucide-react'
 import { ProfileAvatar } from '@/components/profile-avatar'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -19,7 +20,7 @@ type PerfilDoc = NonNullable<Awaited<ReturnType<typeof getPerfil>>>
 export default function PerfilPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ variant: InlineFeedbackVariant; message: string } | null>(null)
 
   const [userId, setUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -83,7 +84,7 @@ export default function PerfilPage() {
     e.preventDefault()
     if (!userId) return
     setSaving(true)
-    setSuccess(null)
+    setFeedback(null)
 
     try {
       await savePerfilDoc(userId, {
@@ -94,20 +95,21 @@ export default function PerfilPage() {
       if (isAdmin && perfil?.role === 'ADMIN' && perfil.academia_id) {
         const wd = normalizeWhatsAppDigits(whatsappAcademia)
         if (!isValidAcademyWhatsAppDigits(wd)) {
-          alert(
-            'Informe um WhatsApp válido da academia (com DDD). Os alunos usam este número para falar com a equipe.'
-          )
+          setFeedback({
+            variant: 'warning',
+            message:
+              'Informe um WhatsApp válido da academia (com DDD). Os alunos usam este número para falar com a equipe.',
+          })
           setSaving(false)
           return
         }
         await updateAcademiaContact(perfil.academia_id, wd)
       }
 
-      setSuccess('Perfil atualizado com sucesso.')
-      setTimeout(() => setSuccess(null), 3000)
+      setFeedback({ variant: 'success', message: 'Perfil atualizado com sucesso!' })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro'
-      alert('Erro ao atualizar perfil: ' + msg)
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      setFeedback({ variant: 'error', message: `Não foi possível atualizar o perfil: ${msg}` })
     } finally {
       setSaving(false)
     }
@@ -116,15 +118,16 @@ export default function PerfilPage() {
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault()
     if (newPassword.length < 6) {
-      alert('A nova senha deve ter pelo menos 6 caracteres.')
+      setFeedback({ variant: 'warning', message: 'A nova senha deve ter pelo menos 6 caracteres.' })
       return
     }
     if (newPassword !== confirmPassword) {
-      alert('As senhas não coincidem!')
+      setFeedback({ variant: 'warning', message: 'As senhas não coincidem. Digite a mesma senha nos dois campos.' })
       return
     }
 
     setSaving(true)
+    setFeedback(null)
     try {
       const auth = getFirebaseAuth()
       const u = auth.currentUser
@@ -146,11 +149,10 @@ export default function PerfilPage() {
       setConfirmPassword('')
       setPasswordSessionMode('stay')
       await u.reload()
-      setSuccess('Senha alterada com sucesso.')
-      setTimeout(() => setSuccess(null), 3000)
+      setFeedback({ variant: 'success', message: 'Senha alterada com sucesso.' })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Erro'
-      alert('Erro ao alterar senha: ' + msg)
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      setFeedback({ variant: 'error', message: `Não foi possível alterar a senha: ${msg}` })
     } finally {
       setSaving(false)
     }
@@ -172,12 +174,15 @@ export default function PerfilPage() {
           <p className="text-[#A6A6A6] mt-1">Gerencie suas informações pessoais e segurança da conta.</p>
         </header>
 
-        {success && (
-          <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3 text-emerald-400 animate-in fade-in zoom-in-95 duration-300">
-            <CheckCircle2 className="w-5 h-5" />
-            <span className="text-sm font-medium">{success}</span>
-          </div>
-        )}
+        {feedback ? (
+          <InlineFeedback
+            variant={feedback.variant}
+            message={feedback.message}
+            onDismiss={() => setFeedback(null)}
+            autoDismissMs={feedback.variant === 'success' ? 4000 : undefined}
+            className="mb-6"
+          />
+        ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">

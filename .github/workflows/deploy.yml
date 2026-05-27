@@ -1,0 +1,69 @@
+# Manual deploy: Vercel (frontend), Render (backend via deploy hook), or both (mixed).
+#
+# Secrets (per GitHub Environment: staging / production):
+#   VERCEL_TOKEN           — Vercel → Account → Tokens (never commit; paste only in GitHub)
+#   VERCEL_ORG_ID          — Vercel project settings / .vercel/project.json
+#   VERCEL_PROJECT_ID      — same
+#   RENDER_DEPLOY_HOOK_URL — Render → Web Service → Settings → Deploy Hook (full URL)
+#
+# After rotating VERCEL_TOKEN on Vercel, add the new value only in:
+#   Repo → Settings → Environments → staging (and/or production) → Environment secrets
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment (staging or production)
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      provider:
+        description: Where to deploy
+        required: true
+        type: choice
+        options:
+          - vercel
+          - render
+          - mixed
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy (${{ github.event.inputs.provider }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy frontend (Vercel)
+        if: ${{ github.event.inputs.provider == 'vercel' || github.event.inputs.provider == 'mixed' }}
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: frontend
+          vercel-args: ${{ github.event.inputs.environment == 'production' && '--prod' || '' }}
+
+      - name: Trigger Render deploy hook
+        if: ${{ github.event.inputs.provider == 'render' || github.event.inputs.provider == 'mixed' }}
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "${RENDER_DEPLOY_HOOK_URL}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL is not set for this environment."
+            exit 1
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"

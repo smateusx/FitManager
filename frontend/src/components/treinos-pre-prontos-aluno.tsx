@@ -7,6 +7,7 @@ import {
   treinoPreProntoParaData,
   treinoPreProntoPorWeekday,
 } from '@/lib/treinos-pre-prontos-iniciante'
+import { TreinoContextBanner } from '@/components/treino-context-banner'
 
 const DIAS_SEMANA_CURTO = [
   'Domingo',
@@ -18,7 +19,14 @@ const DIAS_SEMANA_CURTO = [
   'Sábado',
 ] as const
 
-export function TreinosPreProntosAluno() {
+type TreinosPreProntosContext = 'portal' | 'admin'
+
+type TreinosPreProntosAlunoProps = {
+  /** portal = texto para o aluno; admin = texto para recepção e dono */
+  context?: TreinosPreProntosContext
+}
+
+export function TreinosPreProntosAluno({ context = 'portal' }: TreinosPreProntosAlunoProps) {
   const [semCompleta, setSemCompleta] = useState(false)
   const agora = useMemo(() => new Date(), [])
   const diaJs = agora.getDay()
@@ -35,11 +43,23 @@ export function TreinosPreProntosAluno() {
         <div className="min-w-0">
           <h2 className="text-lg font-bold text-white">Treinos prontos para iniciantes</h2>
           <p className="mt-1 text-sm leading-relaxed text-[#A6A6A6]">
-            Sugestão de segunda a sábado, com sete exercícios por treino. Quinta repete o da segunda, sexta o da terça e
-            sábado o da quarta. Use como referência junto com a ficha que a academia montar para você.
+            {context === 'admin' ? (
+              <>
+                Mesma sugestão que o aluno vê no app. Segunda a sábado, sete exercícios por treino. Quinta repete o da
+                segunda, sexta o da terça e sábado o da quarta. Use como referência ao montar fichas ou enquanto ainda não
+                há planilha cadastrada.
+              </>
+            ) : (
+              <>
+                Sugestão de segunda a sábado, com sete exercícios por treino. Quinta repete o da segunda, sexta o da
+                terça e sábado o da quarta. Use como referência junto com a ficha que a academia montar para você.
+              </>
+            )}
           </p>
         </div>
       </div>
+
+      <TreinoContextBanner variant="sugerido" className="mt-4" />
 
       {treinoHoje ? (
         <div className="mt-5 rounded-xl border border-[#585759]/40 bg-[#0D0D0D]/80 p-4 sm:p-5">

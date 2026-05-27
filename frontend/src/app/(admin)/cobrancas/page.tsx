@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { InlineFeedback } from '@/components/ui/inline-feedback'
 import { useAuth } from '@/hooks/use-auth'
 
 type Vencimento = {
@@ -36,6 +37,7 @@ export default function CobrancasPage() {
   const [vencimentos, setVencimentos] = useState<Vencimento[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const [listFeedback, setListFeedback] = useState<string | null>(null)
 
   const fetchVencimentos = useCallback(async () => {
     if (!academiaId) return
@@ -69,7 +71,7 @@ export default function CobrancasPage() {
 
   const handleSendWhatsApp = (v: Vencimento) => {
     if (!v.aluno_telefone) {
-      alert('Aluno sem telefone cadastrado.')
+      setListFeedback(`Cadastre o telefone de ${v.aluno_nome} antes de enviar cobrança pelo WhatsApp.`)
       return
     }
     const mensagem = WhatsAppService.getBillingMessage(
@@ -145,6 +147,14 @@ export default function CobrancasPage() {
 
   return (
     <div className="mx-auto min-h-0 max-w-6xl p-4 sm:p-6 lg:p-8">
+      {listFeedback ? (
+        <InlineFeedback
+          variant="warning"
+          message={listFeedback}
+          onDismiss={() => setListFeedback(null)}
+          className="mb-6"
+        />
+      ) : null}
       <header className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-[#F2B705] sm:text-3xl">Central de Cobranças</h1>
