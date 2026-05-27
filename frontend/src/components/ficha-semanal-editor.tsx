@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import { Copy, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,9 @@ import {
 } from '@/components/biblioteca-exercicios-picker'
 import { useBibliotecaExercicios } from '@/hooks/use-biblioteca-exercicios'
 import {
+  abrirLinhaPersonalizada,
   DIAS_SEMANA_TREINO,
+  inserirExercicioNoDia,
   isExercicioSemanaVazio,
   type ExercicioSemanaForm,
   type JsWeekday,
@@ -43,24 +46,48 @@ export function FichaSemanalEditor({
   const biblioteca = useBibliotecaExercicios(academiaId)
   const { catalogo } = biblioteca
   const exerciciosDia = semana[diaAtivo]
+  const secaoExerciciosRef = useRef<HTMLDivElement>(null)
+  const [focusIndice, setFocusIndice] = useState<number | null>(null)
 
   function setDiaExercicios(lista: ExercicioSemanaForm[]) {
     onSemanaChange({ ...semana, [diaAtivo]: lista })
   }
 
-  function addExercicio(preset?: ExercicioSemanaForm) {
-    const novo = preset ? { ...preset } : { ...BLANK }
-
-    if (preset) {
-      const idxVazio = exerciciosDia.findIndex(isExercicioSemanaVazio)
-      if (idxVazio >= 0) {
-        setDiaExercicios(exerciciosDia.map((ex, idx) => (idx === idxVazio ? novo : ex)))
-        return
-      }
-    }
-
-    setDiaExercicios([...exerciciosDia, novo])
+  function scrollParaExercicios() {
+    requestAnimationFrame(() => {
+      secaoExerciciosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
+
+  function addExercicioDaBiblioteca(preset: ExercicioSemanaForm) {
+    const { lista } = inserirExercicioNoDia(exerciciosDia, preset)
+    setDiaExercicios(lista)
+    scrollParaExercicios()
+  }
+
+  function handleEscreverPersonalizado() {
+    const { lista, indice } = abrirLinhaPersonalizada(exerciciosDia, BLANK)
+    setDiaExercicios(lista)
+    setFocusIndice(indice)
+    scrollParaExercicios()
+  }
+
+  function addExercicioPersonalizadoExtra() {
+    const { lista, indice } = abrirLinhaPersonalizada(exerciciosDia, BLANK)
+    setDiaExercicios(lista)
+    setFocusIndice(indice)
+  }
+
+  useEffect(() => {
+    if (focusIndice === null) return
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`exercicio-nome-${diaAtivo}-${focusIndice}`)
+      el?.focus()
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFocusIndice(null)
+    }, 150)
+    return () => window.clearTimeout(t)
+  }, [focusIndice, diaAtivo, exerciciosDia.length])
 
   function removeExercicio(i: number) {
     setDiaExercicios(exerciciosDia.filter((_, idx) => idx !== i))
@@ -73,17 +100,18 @@ export function FichaSemanalEditor({
   }
 
   function preencherExercicio(i: number, preset: ExercicioSemanaForm) {
+    const filled = { ...preset, carga: exerciciosDia[i]?.carga || preset.carga }
     setDiaExercicios(
-      exerciciosDia.map((ex, idx) =>
-        idx === i ? { ...preset, carga: ex.carga || preset.carga } : ex
-      )
+      exerciciosDia
+        .map((ex, idx) => (idx === i ? filled : ex))
+        .filter((ex) => !isExercicioSemanaVazio(ex))
     )
   }
 
   function copiarDe(diaOrigem: JsWeekday) {
     if (diaOrigem === diaAtivo) return
     const copia = semana[diaOrigem].map((ex) => ({ ...ex }))
-    setDiaExercicios(copia.length ? copia : [{ ...BLANK }])
+    setDiaExercicios(copia)
   }
 
   function limparDia() {
@@ -155,34 +183,41 @@ export function FichaSemanalEditor({
         </div>
       </div>
 
-      <BibliotecaExerciciosPicker
-        biblioteca={biblioteca}
-        onAdicionar={(ex) => addExercicio(ex)}
-        onAdicionarPersonalizado={() => addExercicio()}
-      />
-
-      {exerciciosDia.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[#585759]/40 px-4 py-6 text-center">
-          <p className="text-sm text-[#A6A6A6]">
-            Nenhum exercício neste dia. Escolha na biblioteca acima ou escreva um personalizado.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-[#585759]">Exercícios do dia</span>
+      {/* Exercícios do dia — acima da biblioteca para ficar visível ao escrever personalizado */}
+      <div
+        ref={secaoExerciciosRef}
+        id="secao-exercicios-dia"
+        className="scroll-mt-4 rounded-xl border border-[#585759]/40 bg-[#0D0D0D]/40 p-4"
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
+            Exercícios do dia
+          </span>
+          {exerciciosDia.length > 0 ? (
             <button
               type="button"
-              onClick={() => addExercicio()}
+              onClick={addExercicioPersonalizadoExtra}
               className="flex items-center gap-1 text-sm text-[#F2B705] hover:text-[#BF9004]"
             >
-              <Plus className="h-4 w-4" /> Personalizado
+              <Plus className="h-4 w-4" /> Outro personalizado
             </button>
-          </div>
+          ) : null}
+        </div>
 
-          <div className="max-h-[min(50vh,28rem)] space-y-3 overflow-y-auto pr-1">
+        {exerciciosDia.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#585759]/40 px-4 py-6 text-center">
+            <p className="text-sm text-[#A6A6A6]">
+              Nenhum exercício neste dia. Escolha na biblioteca abaixo ou clique em{' '}
+              <strong className="text-[#F2B705]">Escrever personalizado</strong>.
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[min(40vh,24rem)] space-y-3 overflow-y-auto pr-1">
             {exerciciosDia.map((ex, i) => (
-              <div key={`${diaAtivo}-${i}`} className="space-y-3 rounded-xl border border-[#585759]/40 bg-[#585759]/5 p-4">
+              <div
+                key={`${diaAtivo}-${i}`}
+                className="space-y-3 rounded-xl border border-[#585759]/40 bg-[#585759]/5 p-4"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
                     Exercício {i + 1}
@@ -205,6 +240,7 @@ export function FichaSemanalEditor({
                 <div className="space-y-1">
                   <Label className="text-xs text-[#585759]">Nome do exercício</Label>
                   <Input
+                    id={`exercicio-nome-${diaAtivo}-${i}`}
                     value={ex.nome}
                     onChange={(e) => updateExercicio(i, 'nome', e.target.value)}
                     placeholder="Digite ou edite o nome do exercício"
@@ -254,8 +290,14 @@ export function FichaSemanalEditor({
               </div>
             ))}
           </div>
-        </>
-      )}
+        )}
+      </div>
+
+      <BibliotecaExerciciosPicker
+        biblioteca={biblioteca}
+        onAdicionar={(ex) => addExercicioDaBiblioteca(ex)}
+        onAdicionarPersonalizado={handleEscreverPersonalizado}
+      />
 
       {exerciciosDia.length > 0 ? (
         <p className="flex items-center gap-1 text-[10px] text-[#585759]">

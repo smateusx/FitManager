@@ -49,6 +49,38 @@ export function isExercicioSemanaVazio(ex: ExercicioSemanaForm): boolean {
   return !ex.nome.trim()
 }
 
+/** Substitui o primeiro slot vazio; senão adiciona ao final. Remove outros vazios ao preencher da biblioteca. */
+export function inserirExercicioNoDia(
+  lista: ExercicioSemanaForm[],
+  exercicio: ExercicioSemanaForm
+): { lista: ExercicioSemanaForm[]; indice: number } {
+  const idxVazio = lista.findIndex(isExercicioSemanaVazio)
+
+  if (idxVazio >= 0) {
+    const comSubstituicao = lista.map((ex, idx) => (idx === idxVazio ? { ...exercicio } : ex))
+    if (!isExercicioSemanaVazio(exercicio)) {
+      const limpa = comSubstituicao.filter((ex) => !isExercicioSemanaVazio(ex))
+      const indice = limpa.findIndex(
+        (ex) => ex.nome.trim() === exercicio.nome.trim()
+      )
+      return { lista: limpa, indice: indice >= 0 ? indice : Math.max(0, limpa.length - 1) }
+    }
+    return { lista: comSubstituicao, indice: idxVazio }
+  }
+
+  return { lista: [...lista, { ...exercicio }], indice: lista.length }
+}
+
+/** Abre linha para escrita personalizada sem duplicar slot vazio. */
+export function abrirLinhaPersonalizada(
+  lista: ExercicioSemanaForm[],
+  blank: ExercicioSemanaForm
+): { lista: ExercicioSemanaForm[]; indice: number } {
+  const idxVazio = lista.findIndex(isExercicioSemanaVazio)
+  if (idxVazio >= 0) return { lista, indice: idxVazio }
+  return { lista: [...lista, { ...blank }], indice: lista.length }
+}
+
 export type SemanaTreinoForm = Record<JsWeekday, ExercicioSemanaForm[]>
 
 export function criarSemanaVazia(): SemanaTreinoForm {
