@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  BibliotecaExerciciosPicker,
+  PreencherDaBiblioteca,
+} from '@/components/biblioteca-exercicios-picker'
+import {
   DIAS_SEMANA_TREINO,
   type ExercicioSemanaForm,
   type JsWeekday,
@@ -33,8 +37,8 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
     onSemanaChange({ ...semana, [diaAtivo]: lista })
   }
 
-  function addExercicio() {
-    setDiaExercicios([...exerciciosDia, { ...BLANK }])
+  function addExercicio(preset?: ExercicioSemanaForm) {
+    setDiaExercicios([...exerciciosDia, preset ? { ...preset } : { ...BLANK }])
   }
 
   function removeExercicio(i: number) {
@@ -44,6 +48,12 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
   function updateExercicio(i: number, field: keyof ExercicioSemanaForm, value: string | number) {
     setDiaExercicios(
       exerciciosDia.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex))
+    )
+  }
+
+  function preencherExercicio(i: number, preset: ExercicioSemanaForm) {
+    setDiaExercicios(
+      exerciciosDia.map((ex, idx) => (idx === i ? { ...preset, carga: ex.carga || preset.carga } : ex))
     )
   }
 
@@ -122,12 +132,16 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
         </div>
       </div>
 
+      <BibliotecaExerciciosPicker
+        onAdicionar={(ex) => addExercicio(ex)}
+        onAdicionarPersonalizado={() => addExercicio()}
+      />
+
       {exerciciosDia.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[#585759]/40 px-4 py-8 text-center">
-          <p className="text-sm text-[#A6A6A6]">Nenhum exercício neste dia.</p>
-          <Button type="button" variant="outline" size="sm" onClick={addExercicio} className="mt-3 border-[#585759]">
-            <Plus className="mr-1 h-4 w-4" /> Adicionar exercício
-          </Button>
+        <div className="rounded-xl border border-dashed border-[#585759]/40 px-4 py-6 text-center">
+          <p className="text-sm text-[#A6A6A6]">
+            Nenhum exercício neste dia. Escolha na biblioteca acima ou escreva um personalizado.
+          </p>
         </div>
       ) : (
         <>
@@ -135,10 +149,10 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
             <span className="text-xs uppercase tracking-wider text-[#585759]">Exercícios do dia</span>
             <button
               type="button"
-              onClick={addExercicio}
+              onClick={() => addExercicio()}
               className="flex items-center gap-1 text-sm text-[#F2B705] hover:text-[#BF9004]"
             >
-              <Plus className="h-4 w-4" /> Adicionar
+              <Plus className="h-4 w-4" /> Personalizado
             </button>
           </div>
 
@@ -158,12 +172,19 @@ export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChan
                     <X className="h-4 w-4" />
                   </button>
                 </div>
-                <Input
-                  value={ex.nome}
-                  onChange={(e) => updateExercicio(i, 'nome', e.target.value)}
-                  placeholder="Nome do exercício"
-                  className="border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
-                />
+
+                <PreencherDaBiblioteca onPreencher={(preset) => preencherExercicio(i, preset)} />
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#585759]">Nome do exercício</Label>
+                  <Input
+                    value={ex.nome}
+                    onChange={(e) => updateExercicio(i, 'nome', e.target.value)}
+                    placeholder="Digite ou edite o nome do exercício"
+                    className="border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-[#585759]">Séries</Label>
