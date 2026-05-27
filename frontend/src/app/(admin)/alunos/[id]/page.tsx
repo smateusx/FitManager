@@ -390,22 +390,23 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
 
           {activeTab === 'treinos' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <TreinosPreProntosAluno context="admin" />
-
               {fichas.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#585759]/30 py-12 text-center">
-                  <Dumbbell className="mx-auto mb-3 h-10 w-10 text-[#585759]" />
-                  <p className="text-[#A6A6A6]">
-                    Este aluno ainda não possui fichas oficiais cadastradas pela academia.
-                  </p>
-                  <Button
-                    variant="link"
-                    className="mt-2 text-[#F2B705]"
-                    onClick={() => router.push('/treinos')}
-                  >
-                    Ir para Gestão de Treinos
-                  </Button>
-                </div>
+                <>
+                  <TreinosPreProntosAluno context="admin" />
+                  <div className="rounded-2xl border border-dashed border-[#585759]/30 py-12 text-center">
+                    <Dumbbell className="mx-auto mb-3 h-10 w-10 text-[#585759]" />
+                    <p className="text-[#A6A6A6]">
+                      Quando cadastrar uma ficha oficial, o treino sugerido deixa de aparecer para este aluno.
+                    </p>
+                    <Button
+                      variant="link"
+                      className="mt-2 text-[#F2B705]"
+                      onClick={() => router.push('/treinos')}
+                    >
+                      Ir para Gestão de Treinos
+                    </Button>
+                  </div>
+                </>
               ) : (
                 <>
                   <TreinoContextBanner variant="oficial" />

@@ -45,14 +45,13 @@ export function TreinosPreProntosAluno({ context = 'portal' }: TreinosPreProntos
           <p className="mt-1 text-sm leading-relaxed text-[#A6A6A6]">
             {context === 'admin' ? (
               <>
-                Mesma sugestão que o aluno vê no app. Segunda a sábado, sete exercícios por treino. Quinta repete o da
-                segunda, sexta o da terça e sábado o da quarta. Use como referência ao montar fichas ou enquanto ainda não
-                há planilha cadastrada.
+                Mesma sugestão que o aluno vê enquanto não há ficha oficial. Segunda a sábado, sete exercícios por
+                treino. Some automaticamente após cadastrar a ficha na gestão de treinos.
               </>
             ) : (
               <>
-                Sugestão de segunda a sábado, com sete exercícios por treino. Quinta repete o da segunda, sexta o da
-                terça e sábado o da quarta. Use como referência junto com a ficha que a academia montar para você.
+                Sugestão automática enquanto a academia ainda não cadastrou sua ficha. Quando houver treino oficial,
+                ele substitui esta tela.
               </>
             )}
           </p>

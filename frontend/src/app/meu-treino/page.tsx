@@ -263,23 +263,12 @@ export default function MeuTreinoPage() {
               />
             ) : null}
 
-            <TreinosPreProntosAluno />
-
             {fichas.length === 0 ? (
-              <div className="mt-8 flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-[#585759]/40 py-16 text-center">
-                <div className="rounded-2xl bg-[#F2B705]/10 p-5">
-                  <Dumbbell className="h-10 w-10 text-[#F2B705]" />
-                </div>
-                <p className="text-lg font-semibold text-white">Nenhuma ficha oficial ainda</p>
-                <p className="max-w-xs text-sm text-[#A6A6A6]">
-                  Enquanto isso, use o treino sugerido acima. Quando a academia cadastrar sua ficha, ela aparecerá aqui
-                  com registro de carga e evolução.
-                </p>
-              </div>
+              <TreinosPreProntosAluno />
             ) : (
               <>
-                <div className="mt-10 space-y-4">
-                  <TreinoContextBanner variant="oficial" />
+                <TreinoContextBanner variant="oficial" />
+                <div className="space-y-4">
                   {fichas.map((ficha) => {
                   const isExpanded = expandedId === ficha.id
                   const exs = (ficha.exercicios ?? []).sort((a, b) => a.ordem - b.ordem)
