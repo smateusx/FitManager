@@ -18,6 +18,7 @@ import {
 import { getDb } from '@/lib/firebase'
 import {
   cloneCatalogoPadrao,
+  deduplicarCatalogo,
   normalizarCatalogo,
   type CatalogoExercicios,
 } from '@/lib/catalogo-exercicios-musculo'
@@ -496,16 +497,17 @@ export async function getBibliotecaCatalogoAcademia(academiaId: string) {
   const snap = await getDoc(doc(getDb(), 'biblioteca_exercicios', academiaId))
   if (!snap.exists()) return cloneCatalogoPadrao()
   const normalizado = normalizarCatalogo(snap.data().catalogo)
-  return normalizado ?? cloneCatalogoPadrao()
+  return deduplicarCatalogo(normalizado ?? cloneCatalogoPadrao())
 }
 
 export async function saveBibliotecaCatalogoAcademia(
   academiaId: string,
   catalogo: CatalogoExercicios
 ) {
+  const limpo = deduplicarCatalogo(catalogo)
   await setDoc(
     doc(getDb(), 'biblioteca_exercicios', academiaId),
-    { catalogo, updated_at: serverTimestamp() },
+    { catalogo: limpo, updated_at: serverTimestamp() },
     { merge: true }
   )
 }

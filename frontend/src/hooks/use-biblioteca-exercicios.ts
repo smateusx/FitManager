@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getBibliotecaCatalogoAcademia,
   saveBibliotecaCatalogoAcademia,
 } from '@/lib/firestore'
 import {
   cloneCatalogoPadrao,
+  deduplicarCatalogo,
   exercicioExisteNoGrupo,
   type CatalogoExercicios,
   type ExercicioPreset,
@@ -15,14 +16,26 @@ import {
 
 type PersistResult = { ok: true } | { ok: false; erro: string }
 
+type AdicionarResult =
+  | { ok: true; nome: string }
+  | { ok: false; erro: string; duplicado?: true; nome?: string }
+
 export function useBibliotecaExercicios(academiaId: string | null) {
   const [catalogo, setCatalogo] = useState<CatalogoExercicios>(() => cloneCatalogoPadrao())
   const [loading, setLoading] = useState(!!academiaId)
   const [saving, setSaving] = useState(false)
+  const catalogoRef = useRef(catalogo)
+  const salvandoRef = useRef(false)
+
+  useEffect(() => {
+    catalogoRef.current = catalogo
+  }, [catalogo])
 
   useEffect(() => {
     if (!academiaId) {
-      setCatalogo(cloneCatalogoPadrao())
+      const padrao = cloneCatalogoPadrao()
+      catalogoRef.current = padrao
+      setCatalogo(padrao)
       setLoading(false)
       return
     }
@@ -31,10 +44,15 @@ export function useBibliotecaExercicios(academiaId: string | null) {
     setLoading(true)
     getBibliotecaCatalogoAcademia(academiaId)
       .then((data) => {
-        if (!cancelled) setCatalogo(data)
+        if (cancelled) return
+        catalogoRef.current = data
+        setCatalogo(data)
       })
       .catch(() => {
-        if (!cancelled) setCatalogo(cloneCatalogoPadrao())
+        if (cancelled) return
+        const padrao = cloneCatalogoPadrao()
+        catalogoRef.current = padrao
+        setCatalogo(padrao)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -46,63 +64,75 @@ export function useBibliotecaExercicios(academiaId: string | null) {
   }, [academiaId])
 
   const persistir = useCallback(
-    async (proximo: CatalogoExercicios): Promise<PersistResult> => {
+    async (proximo: CatalogoExercicios, anterior: CatalogoExercicios): Promise<PersistResult> => {
       if (!academiaId) {
         return { ok: false, erro: 'Não foi possível identificar a academia. Recarregue a página.' }
       }
+      if (salvandoRef.current) {
+        return { ok: false, erro: 'Aguarde o salvamento anterior terminar.' }
+      }
 
-      const anterior = catalogo
-      setCatalogo(proximo)
+      const limpo = deduplicarCatalogo(proximo)
+      salvandoRef.current = true
       setSaving(true)
+      catalogoRef.current = limpo
+      setCatalogo(limpo)
+
       try {
-        await saveBibliotecaCatalogoAcademia(academiaId, proximo)
+        await saveBibliotecaCatalogoAcademia(academiaId, limpo)
         return { ok: true }
       } catch {
+        catalogoRef.current = anterior
         setCatalogo(anterior)
         return { ok: false, erro: 'Erro ao salvar a biblioteca. Tente novamente.' }
       } finally {
+        salvandoRef.current = false
         setSaving(false)
       }
     },
-    [academiaId, catalogo]
+    [academiaId]
   )
 
   const adicionarNaLista = useCallback(
-    async (grupo: GrupoMuscular, preset: ExercicioPreset) => {
+    async (grupo: GrupoMuscular, preset: ExercicioPreset): Promise<AdicionarResult> => {
       const nome = preset.nome.trim()
-      if (!nome) return { ok: false as const, erro: 'Informe o nome do exercício.' }
+      if (!nome) return { ok: false, erro: 'Informe o nome do exercício.' }
 
-      if (exercicioExisteNoGrupo(catalogo[grupo], nome)) {
+      const atual = catalogoRef.current
+
+      if (exercicioExisteNoGrupo(atual[grupo], nome)) {
         return {
-          ok: false as const,
+          ok: false,
           erro: `${nome}, já foi adicionado à lista.`,
-          duplicado: true as const,
+          duplicado: true,
           nome,
         }
       }
 
-      const proximo = {
-        ...catalogo,
-        [grupo]: [...catalogo[grupo], { ...preset, nome }],
-      }
-      const saved = await persistir(proximo)
-      if (!saved.ok) return { ok: false as const, erro: saved.erro }
-      return { ok: true as const, nome }
+      const proximo = deduplicarCatalogo({
+        ...atual,
+        [grupo]: [...atual[grupo], { ...preset, nome }],
+      })
+
+      const saved = await persistir(proximo, atual)
+      if (!saved.ok) return { ok: false, erro: saved.erro }
+      return { ok: true, nome }
     },
-    [catalogo, persistir]
+    [persistir]
   )
 
   const removerDaLista = useCallback(
     async (grupo: GrupoMuscular, nome: string) => {
-      const proximo = {
-        ...catalogo,
-        [grupo]: catalogo[grupo].filter((ex) => ex.nome !== nome),
-      }
-      const saved = await persistir(proximo)
+      const atual = catalogoRef.current
+      const proximo = deduplicarCatalogo({
+        ...atual,
+        [grupo]: atual[grupo].filter((ex) => ex.nome !== nome),
+      })
+      const saved = await persistir(proximo, atual)
       if (!saved.ok) throw new Error(saved.erro)
       return nome
     },
-    [catalogo, persistir]
+    [persistir]
   )
 
   const atualizarNaLista = useCallback(
@@ -110,10 +140,10 @@ export function useBibliotecaExercicios(academiaId: string | null) {
       const nome = preset.nome.trim()
       if (!nome) return { ok: false as const, erro: 'Informe o nome do exercício.' }
 
-      if (exercicioExisteNoGrupo(
-        catalogo[grupo].filter((ex) => ex.nome !== nomeAtual),
-        nome
-      )) {
+      const atual = catalogoRef.current
+      const outros = atual[grupo].filter((ex) => ex.nome !== nomeAtual)
+
+      if (exercicioExisteNoGrupo(outros, nome)) {
         return {
           ok: false as const,
           erro: `${nome}, já foi adicionado à lista.`,
@@ -122,15 +152,15 @@ export function useBibliotecaExercicios(academiaId: string | null) {
         }
       }
 
-      const proximo = {
-        ...catalogo,
-        [grupo]: catalogo[grupo].map((ex) => (ex.nome === nomeAtual ? { ...preset, nome } : ex)),
-      }
-      const saved = await persistir(proximo)
+      const proximo = deduplicarCatalogo({
+        ...atual,
+        [grupo]: atual[grupo].map((ex) => (ex.nome === nomeAtual ? { ...preset, nome } : ex)),
+      })
+      const saved = await persistir(proximo, atual)
       if (!saved.ok) return { ok: false as const, erro: saved.erro }
       return { ok: true as const, nome }
     },
-    [catalogo, persistir]
+    [persistir]
   )
 
   return {

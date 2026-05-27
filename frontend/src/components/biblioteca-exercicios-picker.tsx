@@ -53,6 +53,7 @@ export function BibliotecaExerciciosPicker({
   )
   const [removendo, setRemovendo] = useState(false)
   const [mostrarFormInclusao, setMostrarFormInclusao] = useState(false)
+  const [incluindoNaLista, setIncluindoNaLista] = useState(false)
 
   const lista = catalogo[grupoAtivo]
   const grupoLabel = GRUPOS_MUSCULARES.find((g) => g.id === grupoAtivo)?.label ?? 'Grupo'
@@ -78,18 +79,31 @@ export function BibliotecaExerciciosPicker({
 
   async function handleIncluirNaLista(e: React.FormEvent) {
     e.preventDefault()
+    if (incluindoNaLista || saving) return
+
     if (jaExisteNaLista) {
       mostrarFeedback('warning', `${nomeNovoTrim}, já foi adicionado à lista de ${grupoLabel}.`)
       return
     }
-    const result = await adicionarNaLista(grupoAtivo, novoPreset)
-    if (!result.ok) {
-      mostrarFeedback('warning', result.erro)
-      return
+
+    setIncluindoNaLista(true)
+    try {
+      const result = await adicionarNaLista(grupoAtivo, novoPreset)
+      if (!result.ok) {
+        mostrarFeedback(
+          'warning',
+          result.duplicado
+            ? `${nomeNovoTrim || result.nome || 'Este exercício'}, já foi adicionado à lista de ${grupoLabel}.`
+            : result.erro
+        )
+        return
+      }
+      setNovoPreset({ ...PRESET_VAZIO })
+      setMostrarFormInclusao(false)
+      mostrarFeedback('success', `${result.nome}, incluído na lista de ${grupoLabel}`)
+    } finally {
+      setIncluindoNaLista(false)
     }
-    setNovoPreset({ ...PRESET_VAZIO })
-    setMostrarFormInclusao(false)
-    mostrarFeedback('success', `${result.nome}, incluído na lista de ${grupoLabel}`)
   }
 
   async function handleSalvarEdicao(nomeOriginal: string) {
@@ -413,11 +427,11 @@ export function BibliotecaExerciciosPicker({
                     <Button
                       type="submit"
                       size="sm"
-                      disabled={saving || !nomeNovoTrim || jaExisteNaLista}
+                      disabled={saving || incluindoNaLista || !nomeNovoTrim || jaExisteNaLista}
                       className="bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]"
                     >
                       <Plus className="mr-1 h-4 w-4" />
-                      Adicionar à lista
+                      {incluindoNaLista ? 'Salvando...' : 'Adicionar à lista'}
                     </Button>
                     <Button
                       type="button"
