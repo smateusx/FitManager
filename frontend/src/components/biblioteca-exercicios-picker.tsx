@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
 import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 import {
+  deduplicarGrupo,
   exercicioExisteNoGrupo,
   GRUPOS_MUSCULARES,
   normalizarNomeExercicio,
@@ -28,23 +29,17 @@ const PRESET_VAZIO: ExercicioPreset = {
 
 type BibliotecaExerciciosPickerProps = {
   biblioteca: ReturnType<typeof useBibliotecaExercicios>
-  exerciciosDoDia?: ExercicioSemanaForm[]
+  diaAtivoTreino: number
+  /** Chave serializada dos nomes já presentes em "Exercícios do dia". */
+  nomesJaNoDiaTreinoChave: string
   onAdicionar: (exercicio: ExercicioSemanaForm) => boolean
   onAdicionarPersonalizado: () => void
 }
 
-function nomesExerciciosNoDia(exercicios: ExercicioSemanaForm[]): Set<string> {
-  const nomes = new Set<string>()
-  for (const ex of exercicios) {
-    const chave = normalizarNomeExercicio(ex.nome)
-    if (chave) nomes.add(chave)
-  }
-  return nomes
-}
-
 export function BibliotecaExerciciosPicker({
   biblioteca,
-  exerciciosDoDia = [],
+  diaAtivoTreino,
+  nomesJaNoDiaTreinoChave,
   onAdicionar,
   onAdicionarPersonalizado,
 }: BibliotecaExerciciosPickerProps) {
@@ -66,37 +61,58 @@ export function BibliotecaExerciciosPicker({
   const [removendo, setRemovendo] = useState(false)
   const [mostrarFormInclusao, setMostrarFormInclusao] = useState(false)
   const [incluindoNaLista, setIncluindoNaLista] = useState(false)
-
-  const listaCatalogo = catalogo[grupoAtivo]
-  const chaveNomesDoDia = exerciciosDoDia
-    .map((ex) => normalizarNomeExercicio(ex.nome))
-    .filter(Boolean)
-    .sort()
-    .join('\0')
-  const [ocultosImediatos, setOcultosImediatos] = useState<Set<string>>(() => new Set())
+  const [pendentesNoDia, setPendentesNoDia] = useState<ReadonlySet<string>>(() => new Set())
 
   useEffect(() => {
-    setOcultosImediatos(new Set())
-  }, [chaveNomesDoDia])
+    setPendentesNoDia(new Set())
+  }, [diaAtivoTreino])
 
-  const nomesNoDia = useMemo(() => {
-    const nomes = nomesExerciciosNoDia(exerciciosDoDia)
-    for (const chave of ocultosImediatos) nomes.add(chave)
+  const nomesJaNoDiaTreino = useMemo(() => {
+    const nomes = new Set<string>()
+    if (!nomesJaNoDiaTreinoChave) return nomes
+    for (const chave of nomesJaNoDiaTreinoChave.split('\0')) {
+      if (chave) nomes.add(chave)
+    }
     return nomes
-  }, [exerciciosDoDia, ocultosImediatos])
-  const lista = modoEdicao
-    ? listaCatalogo
-    : listaCatalogo.filter((preset) => !nomesNoDia.has(normalizarNomeExercicio(preset.nome)))
+  }, [nomesJaNoDiaTreinoChave])
+
+  const listaCatalogoGrupo = deduplicarGrupo(catalogo[grupoAtivo])
+
+  useEffect(() => {
+    setPendentesNoDia((prev) => {
+      if (prev.size === 0) return prev
+      const next = new Set<string>()
+      for (const chave of prev) {
+        if (!nomesJaNoDiaTreino.has(chave)) next.add(chave)
+      }
+      return next
+    })
+  }, [nomesJaNoDiaTreino])
+
+  const ocultosNaListaBiblioteca = useMemo(() => {
+    const ocultos = new Set(nomesJaNoDiaTreino)
+    for (const chave of pendentesNoDia) ocultos.add(chave)
+    return ocultos
+  }, [nomesJaNoDiaTreino, pendentesNoDia])
+
+  /** Lista rolável da biblioteca (botão "Adicionar ao dia") — oculta o que já está no treino do dia. */
+  const listaBibliotecaVisivel = modoEdicao
+    ? listaCatalogoGrupo
+    : listaCatalogoGrupo.filter(
+        (preset) => !ocultosNaListaBiblioteca.has(normalizarNomeExercicio(preset.nome))
+      )
   const grupoLabel = GRUPOS_MUSCULARES.find((g) => g.id === grupoAtivo)?.label ?? 'Grupo'
 
   function contagemGrupo(grupo: GrupoMuscular): number {
-    const total = catalogo[grupo].length
+    const total = deduplicarGrupo(catalogo[grupo]).length
     if (modoEdicao) return total
-    return catalogo[grupo].filter((preset) => !nomesNoDia.has(normalizarNomeExercicio(preset.nome)))
-      .length
+    return deduplicarGrupo(catalogo[grupo]).filter(
+      (preset) => !ocultosNaListaBiblioteca.has(normalizarNomeExercicio(preset.nome))
+    ).length
   }
   const nomeNovoTrim = novoPreset.nome.trim()
-  const jaExisteNaLista = nomeNovoTrim.length > 0 && exercicioExisteNoGrupo(lista, nomeNovoTrim)
+  const jaExisteNaLista =
+    nomeNovoTrim.length > 0 && exercicioExisteNoGrupo(listaCatalogoGrupo, nomeNovoTrim)
 
   useEffect(() => {
     if (!ultimoAdicionadoAoDia) return
@@ -111,14 +127,14 @@ export function BibliotecaExerciciosPicker({
   function handleAdicionarAoDia(preset: ExercicioPreset) {
     if (modoEdicao) return
     const chave = normalizarNomeExercicio(preset.nome)
-    if (!chave || nomesNoDia.has(chave)) {
+    if (!chave || ocultosNaListaBiblioteca.has(chave)) {
       mostrarFeedback('warning', `${preset.nome}, já está neste dia.`)
       return
     }
-    setOcultosImediatos((prev) => new Set(prev).add(chave))
+    setPendentesNoDia((prev) => new Set(prev).add(chave))
     const adicionado = onAdicionar(presetParaForm(preset))
     if (!adicionado) {
-      setOcultosImediatos((prev) => {
+      setPendentesNoDia((prev) => {
         const next = new Set(prev)
         next.delete(chave)
         return next
@@ -191,7 +207,7 @@ export function BibliotecaExerciciosPicker({
           <p className="mt-1 text-xs text-[#585759]">
             {modoEdicao
               ? 'Modo edição: inclua, altere ou remova exercícios da lista da academia.'
-              : 'Escolha o grupo e clique em Adicionar ao dia, ou use Editar lista para gerenciar a biblioteca.'}
+              : 'Lista abaixo: clique em Adicionar ao dia. Exercícios já no treino deste dia somem da lista.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -266,14 +282,14 @@ export function BibliotecaExerciciosPicker({
           </div>
 
           <div className="mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
-            {lista.length === 0 ? (
+            {listaBibliotecaVisivel.length === 0 ? (
               <p className="rounded-lg border border-dashed border-[#585759]/35 px-4 py-6 text-center text-sm text-[#585759]">
-                {!modoEdicao && listaCatalogo.length > 0
+                {!modoEdicao && listaCatalogoGrupo.length > 0
                   ? `Todos os exercícios de ${grupoLabel} já foram adicionados a este dia.`
                   : `Nenhum exercício em ${grupoLabel}. Use o formulário abaixo para incluir.`}
               </p>
             ) : (
-              lista.map((preset) => {
+              listaBibliotecaVisivel.map((preset) => {
                 const adicionadoAgora = ultimoAdicionadoAoDia === preset.nome
                 const editando = editandoNome === preset.nome
 

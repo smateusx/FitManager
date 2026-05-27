@@ -11,6 +11,7 @@ import {
   PreencherDaBiblioteca,
 } from '@/components/biblioteca-exercicios-picker'
 import { useBibliotecaExercicios } from '@/hooks/use-biblioteca-exercicios'
+import { normalizarNomeExercicio } from '@/lib/catalogo-exercicios-musculo'
 import {
   abrirLinhaPersonalizada,
   DIAS_SEMANA_TREINO,
@@ -48,6 +49,12 @@ export function FichaSemanalEditor({
   const { catalogo } = biblioteca
   const exerciciosDia = semana[diaAtivo]
   const secaoExerciciosRef = useRef<HTMLDivElement>(null)
+
+  const chaveNomesJaNoDia = exerciciosDia
+    .map((ex) => normalizarNomeExercicio(ex.nome))
+    .filter(Boolean)
+    .sort()
+    .join('\0')
 
   function updateDiaExercicios(
     updater: (lista: ExercicioSemanaForm[]) => ExercicioSemanaForm[],
@@ -325,9 +332,9 @@ export function FichaSemanalEditor({
       </div>
 
       <BibliotecaExerciciosPicker
-        key={diaAtivo}
         biblioteca={biblioteca}
-        exerciciosDoDia={exerciciosDia}
+        diaAtivoTreino={diaAtivo}
+        nomesJaNoDiaTreinoChave={chaveNomesJaNoDia}
         onAdicionar={(ex) => addExercicioDaBiblioteca(ex)}
         onAdicionarPersonalizado={handleEscreverPersonalizado}
       />
