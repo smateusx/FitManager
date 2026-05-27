@@ -383,7 +383,7 @@ export default function TreinosPage() {
                   className="text-[#A6A6A6] hover:text-white">Cancelar</Button>
                 <Button type="submit" disabled={saving}
                   className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20">
-                  {saving ? 'Salvando...' : editingFichaId ? 'Salvar alterações' : 'Salvar ficha semanal'}
+                  {saving ? 'Salvando...' : editingFichaId ? 'Salvar alterações' : 'Salvar ficha'}
                 </Button>
               </div>
             </form>
