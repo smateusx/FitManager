@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Pencil, PenLine, Plus, Settings2, Trash2 } from 'lucide-react'
+import { Check, Pencil, PenLine, Plus, Settings2, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,6 +51,7 @@ export function BibliotecaExerciciosPicker({
     null
   )
   const [removendo, setRemovendo] = useState(false)
+  const [mostrarFormInclusao, setMostrarFormInclusao] = useState(false)
 
   const lista = catalogo[grupoAtivo]
   const grupoLabel = GRUPOS_MUSCULARES.find((g) => g.id === grupoAtivo)?.label ?? 'Grupo'
@@ -80,6 +81,7 @@ export function BibliotecaExerciciosPicker({
       return
     }
     setNovoPreset({ ...PRESET_VAZIO })
+    setMostrarFormInclusao(false)
     mostrarFeedback('success', `${result.nome}, incluído na lista de ${grupoLabel}`)
   }
 
@@ -126,6 +128,8 @@ export function BibliotecaExerciciosPicker({
             onClick={() => {
               setModoEdicao((v) => !v)
               setEditandoNome(null)
+              setMostrarFormInclusao(false)
+              setNovoPreset({ ...PRESET_VAZIO })
             }}
             className={
               modoEdicao
@@ -173,6 +177,7 @@ export function BibliotecaExerciciosPicker({
                 onClick={() => {
                   setGrupoAtivo(grupo.id)
                   setEditandoNome(null)
+                  setMostrarFormInclusao(false)
                 }}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
                   grupoAtivo === grupo.id
@@ -323,52 +328,96 @@ export function BibliotecaExerciciosPicker({
           </div>
 
           {modoEdicao ? (
-            <form
-              onSubmit={handleIncluirNaLista}
-              className="mt-4 space-y-3 rounded-xl border border-dashed border-[#F2B705]/30 bg-[#F2B705]/5 p-3"
-            >
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
-                Adicionar exercício à lista de {grupoLabel}
-              </p>
-              <Input
-                value={novoPreset.nome}
-                onChange={(e) => setNovoPreset((p) => ({ ...p, nome: e.target.value }))}
-                placeholder="Nome do exercício"
-                required
-                className="border-[#585759] bg-[#0D0D0D] text-white"
-              />
-              <div className="grid grid-cols-3 gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={novoPreset.series}
-                  onChange={(e) => setNovoPreset((p) => ({ ...p, series: Number(e.target.value) }))}
-                  className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
-                  aria-label="Séries"
-                />
-                <Input
-                  value={novoPreset.repeticoes}
-                  onChange={(e) => setNovoPreset((p) => ({ ...p, repeticoes: e.target.value }))}
-                  placeholder="Reps"
-                  className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
-                />
-                <Input
-                  value={novoPreset.descanso}
-                  onChange={(e) => setNovoPreset((p) => ({ ...p, descanso: e.target.value }))}
-                  placeholder="Descanso"
-                  className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
-                />
-              </div>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={saving || !novoPreset.nome.trim()}
-                className="bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]"
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Adicionar à lista
-              </Button>
-            </form>
+            <div className="mt-4">
+              {!mostrarFormInclusao ? (
+                <button
+                  type="button"
+                  onClick={() => setMostrarFormInclusao(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#F2B705]/40 bg-[#F2B705]/5 px-4 py-3 text-sm font-semibold text-[#F2B705] transition-colors hover:border-[#F2B705]/60 hover:bg-[#F2B705]/10"
+                  aria-label={`Adicionar exercício à lista de ${grupoLabel}`}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F2B705]/20">
+                    <Plus className="h-4 w-4" />
+                  </span>
+                  Adicionar exercício à lista de {grupoLabel}
+                </button>
+              ) : (
+                <form
+                  onSubmit={handleIncluirNaLista}
+                  className="space-y-3 rounded-xl border border-dashed border-[#F2B705]/30 bg-[#F2B705]/5 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
+                      Adicionar exercício à lista de {grupoLabel}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMostrarFormInclusao(false)
+                        setNovoPreset({ ...PRESET_VAZIO })
+                      }}
+                      className="rounded p-1 text-[#585759] hover:text-white"
+                      aria-label="Fechar formulário"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <Input
+                    value={novoPreset.nome}
+                    onChange={(e) => setNovoPreset((p) => ({ ...p, nome: e.target.value }))}
+                    placeholder="Nome do exercício"
+                    required
+                    autoFocus
+                    className="border-[#585759] bg-[#0D0D0D] text-white"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={novoPreset.series}
+                      onChange={(e) => setNovoPreset((p) => ({ ...p, series: Number(e.target.value) }))}
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
+                      aria-label="Séries"
+                    />
+                    <Input
+                      value={novoPreset.repeticoes}
+                      onChange={(e) => setNovoPreset((p) => ({ ...p, repeticoes: e.target.value }))}
+                      placeholder="Reps"
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
+                    />
+                    <Input
+                      value={novoPreset.descanso}
+                      onChange={(e) => setNovoPreset((p) => ({ ...p, descanso: e.target.value }))}
+                      placeholder="Descanso"
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={saving || !novoPreset.nome.trim()}
+                      className="bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]"
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Adicionar à lista
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setMostrarFormInclusao(false)
+                        setNovoPreset({ ...PRESET_VAZIO })
+                      }}
+                      className="text-[#A6A6A6]"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
           ) : null}
         </>
       )}
