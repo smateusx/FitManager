@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EvolutionChart } from '@/components/evolution-chart'
 import { TreinosPreProntosAluno } from '@/components/treinos-pre-prontos-aluno'
 import { TreinoContextBanner } from '@/components/treino-context-banner'
+import { FichaSemanalResumo, FichaSemanalView } from '@/components/ficha-semanal-view'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
 import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 import {
@@ -39,6 +40,7 @@ type Exercicio = {
   carga: string
   descanso: string
   ordem: number
+  dia_semana?: number | null
 }
 
 type Ficha = {
@@ -420,36 +422,20 @@ export default function AlunoDetailPage({ params }: { params: Promise<{ id: stri
                           <div>
                             <h4 className="font-bold text-white">{ficha.nome}</h4>
                             <p className="text-xs text-[#A6A6A6]">{ficha.objetivo || 'Sem objetivo definido'}</p>
+                            <div className="mt-1">
+                              <FichaSemanalResumo exercicios={ficha.exercicios} />
+                            </div>
                           </div>
                           <span className="text-xs text-[#585759]">
                             Criada em {new Date(ficha.criado_em).toLocaleDateString('pt-BR')}
                           </span>
                         </div>
-                        <div className="overflow-x-auto p-4">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="text-left text-[10px] uppercase tracking-widest text-[#585759]">
-                                <th className="pb-3 pr-4">Exercício</th>
-                                <th className="px-2 pb-3 text-center">Séries</th>
-                                <th className="px-2 pb-3 text-center">Reps</th>
-                                <th className="px-2 pb-3 text-center">Carga</th>
-                                <th className="px-2 pb-3 text-center">Rest</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#585759]/10">
-                              {ficha.exercicios.map((ex, i) => (
-                                <tr key={i} className="text-[#A6A6A6]">
-                                  <td className="py-2.5 pr-4 font-medium text-white">{ex.nome}</td>
-                                  <td className="px-2 py-2.5 text-center">{ex.series}</td>
-                                  <td className="px-2 py-2.5 text-center">{ex.repeticoes}</td>
-                                  <td className="px-2 py-2.5 text-center font-bold text-[#F2B705]">
-                                    {ex.carga || 'Sem registro'}
-                                  </td>
-                                  <td className="px-2 py-2.5 text-center text-xs">{ex.descanso}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                        <div className="p-4">
+                          {ficha.exercicios.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-[#585759]">Nenhum exercício nesta ficha.</p>
+                          ) : (
+                            <FichaSemanalView exercicios={ficha.exercicios} variant="table" />
+                          )}
                         </div>
                       </div>
                     ))}

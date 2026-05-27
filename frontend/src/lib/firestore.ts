@@ -461,7 +461,15 @@ export async function updateFichaTreino(
 
 export async function replaceExerciciosFicha(
   fichaId: string,
-  rows: { nome: string; series: number; repeticoes: string; carga: string; descanso: string }[]
+  rows: {
+    nome: string
+    series: number
+    repeticoes: string
+    carga: string
+    descanso: string
+    dia_semana?: number
+    ordem?: number
+  }[]
 ) {
   const exQ = query(collection(getDb(), 'exercicios'), where('ficha_id', '==', fichaId))
   const exSnap = await getDocs(exQ)
@@ -472,7 +480,8 @@ export async function replaceExerciciosFicha(
     repeticoes: row.repeticoes,
     carga: row.carga,
     descanso: row.descanso,
-    ordem: i,
+    dia_semana: typeof row.dia_semana === 'number' ? row.dia_semana : 1,
+    ordem: typeof row.ordem === 'number' ? row.ordem : i,
     ficha_id: fichaId,
   }))
   await insertExercicios(exRows)

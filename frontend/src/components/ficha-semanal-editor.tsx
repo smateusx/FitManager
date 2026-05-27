@@ -1,0 +1,222 @@
+'use client'
+
+import { Copy, Plus, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  DIAS_SEMANA_TREINO,
+  type ExercicioSemanaForm,
+  type JsWeekday,
+  type SemanaTreinoForm,
+} from '@/lib/dias-semana-treino'
+
+const BLANK: ExercicioSemanaForm = {
+  nome: '',
+  series: 3,
+  repeticoes: '10 a 12',
+  carga: '',
+  descanso: '60 s',
+}
+
+type FichaSemanalEditorProps = {
+  semana: SemanaTreinoForm
+  diaAtivo: JsWeekday
+  onDiaChange: (dia: JsWeekday) => void
+  onSemanaChange: (semana: SemanaTreinoForm) => void
+}
+
+export function FichaSemanalEditor({ semana, diaAtivo, onDiaChange, onSemanaChange }: FichaSemanalEditorProps) {
+  const exerciciosDia = semana[diaAtivo]
+
+  function setDiaExercicios(lista: ExercicioSemanaForm[]) {
+    onSemanaChange({ ...semana, [diaAtivo]: lista })
+  }
+
+  function addExercicio() {
+    setDiaExercicios([...exerciciosDia, { ...BLANK }])
+  }
+
+  function removeExercicio(i: number) {
+    setDiaExercicios(exerciciosDia.filter((_, idx) => idx !== i))
+  }
+
+  function updateExercicio(i: number, field: keyof ExercicioSemanaForm, value: string | number) {
+    setDiaExercicios(
+      exerciciosDia.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex))
+    )
+  }
+
+  function copiarDe(diaOrigem: JsWeekday) {
+    if (diaOrigem === diaAtivo) return
+    const copia = semana[diaOrigem].map((ex) => ({ ...ex }))
+    setDiaExercicios(copia.length ? copia : [{ ...BLANK }])
+  }
+
+  function limparDia() {
+    setDiaExercicios([])
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-[#A6A6A6]">Treino por dia da semana</Label>
+        <p className="mt-1 text-xs text-[#585759]">
+          Selecione o dia e cadastre os exercícios. Dias vazios ficam como descanso ou sem treino.
+        </p>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {DIAS_SEMANA_TREINO.map((dia) => {
+            const count = semana[dia.js].filter((ex) => ex.nome.trim()).length
+            const ativo = diaAtivo === dia.js
+            return (
+              <button
+                key={dia.js}
+                type="button"
+                onClick={() => onDiaChange(dia.js)}
+                className={`shrink-0 rounded-xl border px-3 py-2 text-left transition-colors ${
+                  ativo
+                    ? 'border-[#F2B705] bg-[#F2B705]/15 text-[#F2B705]'
+                    : 'border-[#585759]/50 bg-[#585759]/10 text-[#A6A6A6] hover:border-[#585759]'
+                }`}
+              >
+                <span className="block text-xs font-bold">{dia.short}</span>
+                <span className="block text-[10px] opacity-80">{count > 0 ? `${count} ex.` : 'Vazio'}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#585759]/30 bg-[#585759]/5 px-3 py-2">
+        <p className="text-sm font-semibold text-white">
+          {DIAS_SEMANA_TREINO.find((d) => d.js === diaAtivo)?.label}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              const v = e.target.value
+              if (!v) return
+              copiarDe(Number(v) as JsWeekday)
+              e.target.value = ''
+            }}
+            className="h-8 rounded-lg border border-[#585759]/50 bg-[#0D0D0D] px-2 text-xs text-[#A6A6A6] outline-none"
+            aria-label="Copiar treino de outro dia"
+          >
+            <option value="">Copiar de...</option>
+            {DIAS_SEMANA_TREINO.filter((d) => d.js !== diaAtivo).map((d) => (
+              <option key={d.js} value={d.js}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={limparDia}
+            className="h-8 text-xs text-[#A6A6A6] hover:text-red-400"
+          >
+            Limpar dia
+          </Button>
+        </div>
+      </div>
+
+      {exerciciosDia.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[#585759]/40 px-4 py-8 text-center">
+          <p className="text-sm text-[#A6A6A6]">Nenhum exercício neste dia.</p>
+          <Button type="button" variant="outline" size="sm" onClick={addExercicio} className="mt-3 border-[#585759]">
+            <Plus className="mr-1 h-4 w-4" /> Adicionar exercício
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-[#585759]">Exercícios do dia</span>
+            <button
+              type="button"
+              onClick={addExercicio}
+              className="flex items-center gap-1 text-sm text-[#F2B705] hover:text-[#BF9004]"
+            >
+              <Plus className="h-4 w-4" /> Adicionar
+            </button>
+          </div>
+
+          <div className="max-h-[min(50vh,28rem)] space-y-3 overflow-y-auto pr-1">
+            {exerciciosDia.map((ex, i) => (
+              <div key={`${diaAtivo}-${i}`} className="space-y-3 rounded-xl border border-[#585759]/40 bg-[#585759]/5 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[#F2B705]">
+                    Exercício {i + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeExercicio(i)}
+                    className="text-[#585759] transition-colors hover:text-red-500"
+                    aria-label="Remover exercício"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <Input
+                  value={ex.nome}
+                  onChange={(e) => updateExercicio(i, 'nome', e.target.value)}
+                  placeholder="Nome do exercício"
+                  className="border-[#585759] bg-[#0D0D0D] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                />
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#585759]">Séries</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={ex.series}
+                      onChange={(e) => updateExercicio(i, 'series', Number(e.target.value))}
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white focus-visible:ring-[#F2B705]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#585759]">Reps</Label>
+                    <Input
+                      value={ex.repeticoes}
+                      onChange={(e) => updateExercicio(i, 'repeticoes', e.target.value)}
+                      placeholder="10 a 12"
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#585759]">Carga</Label>
+                    <Input
+                      value={ex.carga}
+                      onChange={(e) => updateExercicio(i, 'carga', e.target.value)}
+                      placeholder="20 kg"
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#585759]">Descanso</Label>
+                    <Input
+                      value={ex.descanso}
+                      onChange={(e) => updateExercicio(i, 'descanso', e.target.value)}
+                      placeholder="60 s"
+                      className="h-9 border-[#585759] bg-[#0D0D0D] text-sm text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {exerciciosDia.length > 0 ? (
+        <p className="flex items-center gap-1 text-[10px] text-[#585759]">
+          <Copy className="h-3 w-3" aria-hidden />
+          Use copiar de para repetir um dia em outro, como na rotina sugerida.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+export { BLANK as EXERCICIO_SEMANA_VAZIO }

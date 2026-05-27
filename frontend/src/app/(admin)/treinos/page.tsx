@@ -19,16 +19,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
 import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
+import { FichaSemanalEditor, EXERCICIO_SEMANA_VAZIO } from '@/components/ficha-semanal-editor'
+import { FichaSemanalResumo, FichaSemanalView } from '@/components/ficha-semanal-view'
+import {
+  exerciciosParaSemana,
+  semanaComDiaInicial,
+  semanaParaLinhasFirestore,
+  type ExercicioComDia,
+  type JsWeekday,
+  type SemanaTreinoForm,
+} from '@/lib/dias-semana-treino'
 import { useAuth } from '@/hooks/use-auth'
 
-type Exercicio = {
-  id?: string
-  nome: string
-  series: number
-  repeticoes: string
-  carga: string
-  descanso: string
-}
+type Exercicio = ExercicioComDia
 
 type Ficha = {
   id: string
@@ -45,8 +48,6 @@ type AlunoOption = {
   nome_completo: string | null
 }
 
-const BLANK_EXERCICIO: Exercicio = { nome: '', series: 3, repeticoes: '10 a 12', carga: '', descanso: '60s' }
-
 export default function TreinosPage() {
   const { loading: authLoading, isAdmin } = useAuth()
   const [fichas, setFichas] = useState<Ficha[]>([])
@@ -60,7 +61,8 @@ export default function TreinosPage() {
   const [nomeFicha, setNomeFicha] = useState('')
   const [objetivo, setObjetivo] = useState('')
   const [alunoSel, setAlunoSel] = useState('')
-  const [exercicios, setExercicios] = useState<Exercicio[]>([{ ...BLANK_EXERCICIO }])
+  const [semana, setSemana] = useState<SemanaTreinoForm>(() => semanaComDiaInicial(EXERCICIO_SEMANA_VAZIO, 1))
+  const [diaAtivo, setDiaAtivo] = useState<JsWeekday>(1)
   const [saving, setSaving] = useState(false)
   const [editingFichaId, setEditingFichaId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -108,18 +110,20 @@ export default function TreinosPage() {
     })
   }, [authLoading, fetchAll])
 
-  const addExercicio = () => setExercicios(prev => [...prev, { ...BLANK_EXERCICIO }])
-  const removeExercicio = (i: number) => setExercicios(prev => prev.filter((_, idx) => idx !== i))
-  const updateExercicio = (i: number, field: keyof Exercicio, value: string | number) => {
-    setExercicios(prev => prev.map((ex, idx) => idx === i ? { ...ex, [field]: value } : ex))
-  }
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!academiaId || !alunoSel) return
-    setSaving(true)
 
-    const filtered = exercicios.filter((ex) => ex.nome.trim())
+    const linhas = semanaParaLinhasFirestore(semana)
+    if (linhas.length === 0) {
+      setPageFeedback({
+        variant: 'warning',
+        message: 'Adicione ao menos um exercício em algum dia da semana antes de salvar.',
+      })
+      return
+    }
+
+    setSaving(true)
 
     try {
       if (editingFichaId) {
@@ -128,16 +132,8 @@ export default function TreinosPage() {
           objetivo,
           aluno_id: alunoSel,
         })
-        await replaceExerciciosFicha(
-          editingFichaId,
-          filtered.map((ex) => ({
-            nome: ex.nome,
-            series: ex.series,
-            repeticoes: ex.repeticoes,
-            carga: ex.carga,
-            descanso: ex.descanso,
-          }))
-        )
+        await replaceExerciciosFicha(editingFichaId, linhas)
+        setPageFeedback({ variant: 'success', message: 'Ficha semanal atualizada com sucesso.' })
       } else {
         const { id: fichaId } = await insertFicha({
           nome: nomeFicha,
@@ -146,24 +142,24 @@ export default function TreinosPage() {
           academia_id: academiaId,
         })
 
-        const exRows = filtered.map((ex, i) => ({
-          nome: ex.nome,
-          series: ex.series,
-          repeticoes: ex.repeticoes,
-          carga: ex.carga,
-          descanso: ex.descanso,
-          ordem: i,
-          ficha_id: fichaId,
-        }))
-
-        if (exRows.length > 0) {
-          await insertExercicios(exRows)
-        }
+        await insertExercicios(
+          linhas.map((row) => ({
+            ...row,
+            ficha_id: fichaId,
+          }))
+        )
+        setPageFeedback({ variant: 'success', message: 'Ficha semanal criada com sucesso.' })
       }
 
       setShowModal(false)
       resetModal()
-      fetchAll()
+      await fetchAll()
+    } catch (err) {
+      console.error(err)
+      setPageFeedback({
+        variant: 'error',
+        message: 'Não foi possível salvar a ficha. Tente novamente.',
+      })
     } finally {
       setSaving(false)
     }
@@ -193,7 +189,8 @@ export default function TreinosPage() {
     setNomeFicha('')
     setObjetivo('')
     setAlunoSel('')
-    setExercicios([{ ...BLANK_EXERCICIO }])
+    setSemana(semanaComDiaInicial(EXERCICIO_SEMANA_VAZIO, 1))
+    setDiaAtivo(1)
   }
 
   const openCreateModal = () => {
@@ -206,17 +203,8 @@ export default function TreinosPage() {
     setNomeFicha(ficha.nome)
     setObjetivo(ficha.objetivo ?? '')
     setAlunoSel(ficha.aluno_id)
-    setExercicios(
-      ficha.exercicios?.length
-        ? ficha.exercicios.map((ex) => ({
-            nome: ex.nome,
-            series: Number(ex.series) || 1,
-            repeticoes: String(ex.repeticoes ?? ''),
-            carga: String(ex.carga ?? ''),
-            descanso: String(ex.descanso ?? ''),
-          }))
-        : [{ ...BLANK_EXERCICIO }]
-    )
+    setSemana(exerciciosParaSemana(ficha.exercicios ?? []))
+    setDiaAtivo(1)
     setShowModal(true)
   }
 
@@ -226,7 +214,9 @@ export default function TreinosPage() {
         <header className="flex flex-col gap-4 border-b border-[#585759]/30 pb-6 sm:flex-row sm:items-center sm:justify-between sm:pb-8">
           <div className="min-w-0">
             <h1 className="text-2xl font-bold text-[#F2B705] sm:text-3xl">Fichas de Treino</h1>
-            <p className="mt-1 text-sm text-[#A6A6A6] sm:text-base">Crie e gerencie os treinos dos seus alunos.</p>
+            <p className="mt-1 text-sm text-[#A6A6A6] sm:text-base">
+              Monte a semana completa do aluno, com exercícios por dia.
+            </p>
           </div>
           <Button
             onClick={openCreateModal}
@@ -278,12 +268,13 @@ export default function TreinosPage() {
                         <p className="font-semibold text-white">{ficha.nome}</p>
                         <p className="mt-0.5 text-sm text-[#A6A6A6]">
                           Aluno: <span className="text-white">{ficha.perfis?.nome_completo || 'Sem nome'}</span>
-                          {ficha.objetivo && (
-                            <span className="mt-1 block text-[#585759] sm:ml-3 sm:mt-0 sm:inline">
-                              • {ficha.objetivo}
-                            </span>
-                          )}
                         </p>
+                        <div className="mt-1">
+                          <FichaSemanalResumo exercicios={ficha.exercicios ?? []} />
+                        </div>
+                        {ficha.objetivo ? (
+                          <p className="mt-1 text-xs text-[#585759]">{ficha.objetivo}</p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
@@ -325,32 +316,9 @@ export default function TreinosPage() {
                   {isExpanded && (
                     <div className="border-t border-[#585759]/30 p-5">
                       {!ficha.exercicios || ficha.exercicios.length === 0 ? (
-                        <p className="text-[#585759] text-sm text-center py-4">Nenhum exercício nesta ficha.</p>
+                        <p className="py-4 text-center text-sm text-[#585759]">Nenhum exercício nesta ficha.</p>
                       ) : (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="text-[#585759] uppercase text-xs tracking-wider">
-                                <th className="text-left pb-3 pr-4">Exercício</th>
-                                <th className="text-center pb-3 px-2">Séries</th>
-                                <th className="text-center pb-3 px-2">Reps</th>
-                                <th className="text-center pb-3 px-2">Carga</th>
-                                <th className="text-center pb-3 px-2">Descanso</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#585759]/20">
-                              {(ficha.exercicios ?? []).map((ex, i) => (
-                                <tr key={i} className="hover:bg-[#585759]/10 transition-colors">
-                                  <td className="py-3 pr-4 text-white font-medium">{ex.nome}</td>
-                                  <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.series}x</td>
-                                  <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.repeticoes}</td>
-                                  <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.carga || 'Sem registro'}</td>
-                                  <td className="py-3 px-2 text-center text-[#A6A6A6]">{ex.descanso}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        <FichaSemanalView exercicios={ficha.exercicios} variant="table" />
                       )}
                     </div>
                   )}
@@ -363,8 +331,8 @@ export default function TreinosPage() {
 
       {/* Create Ficha Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="my-8 w-full max-w-2xl rounded-2xl border border-[#585759] bg-[#0D0D0D] shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+          <div className="my-8 w-full max-w-3xl rounded-2xl border border-[#585759] bg-[#0D0D0D] shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-6 border-b border-[#585759]/30 flex justify-between items-center sticky top-0 bg-[#0D0D0D] rounded-t-2xl z-10 text-white">
               <h2 className="text-xl font-bold">
                 {editingFichaId ? 'Editar ficha de treino' : 'Nova ficha de treino'}
@@ -379,9 +347,9 @@ export default function TreinosPage() {
                 {/* Nome e Aluno */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-[#A6A6A6]">Nome da Ficha</Label>
+                    <Label className="text-[#A6A6A6]">Nome da ficha</Label>
                     <Input value={nomeFicha} onChange={e => setNomeFicha(e.target.value)} required
-                      placeholder="Ex.: Treino A: peito e tríceps"
+                      placeholder="Ex.: Plano semanal iniciante"
                       className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]" />
                   </div>
                   <div className="space-y-2">
@@ -401,57 +369,12 @@ export default function TreinosPage() {
                     className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]" />
                 </div>
 
-                {/* Exercícios */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-[#A6A6A6]">Exercícios</Label>
-                    <button type="button" onClick={addExercicio}
-                      className="flex items-center gap-1 text-sm text-[#F2B705] hover:text-[#BF9004] transition-colors">
-                      <Plus className="w-4 h-4" /> Adicionar
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {exercicios.map((ex, i) => (
-                      <div key={i} className="p-4 border border-[#585759]/40 rounded-xl bg-[#585759]/5 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#F2B705] text-xs font-semibold uppercase tracking-wider">Exercício {i + 1}</span>
-                          {exercicios.length > 1 && (
-                            <button type="button" onClick={() => removeExercicio(i)}
-                              className="text-[#585759] hover:text-red-500 transition-colors">
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                        <Input value={ex.nome} onChange={e => updateExercicio(i, 'nome', e.target.value)}
-                          placeholder="Nome do exercício" required
-                          className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705]" />
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          <div className="space-y-1">
-                            <Label className="text-[#585759] text-xs">Séries</Label>
-                            <Input type="number" value={ex.series} onChange={e => updateExercicio(i, 'series', Number(e.target.value))} min={1}
-                              className="bg-[#0D0D0D] border-[#585759] text-white focus-visible:ring-[#F2B705] h-9 text-sm" />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[#585759] text-xs">Reps</Label>
-                            <Input value={ex.repeticoes} onChange={e => updateExercicio(i, 'repeticoes', e.target.value)} placeholder="10 a 12"
-                              className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-9 text-sm" />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[#585759] text-xs">Carga</Label>
-                            <Input value={ex.carga} onChange={e => updateExercicio(i, 'carga', e.target.value)} placeholder="20kg"
-                              className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-9 text-sm" />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[#585759] text-xs">Descanso</Label>
-                            <Input value={ex.descanso} onChange={e => updateExercicio(i, 'descanso', e.target.value)} placeholder="60s"
-                              className="bg-[#0D0D0D] border-[#585759] text-white placeholder:text-[#585759] focus-visible:ring-[#F2B705] h-9 text-sm" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <FichaSemanalEditor
+                  semana={semana}
+                  diaAtivo={diaAtivo}
+                  onDiaChange={setDiaAtivo}
+                  onSemanaChange={setSemana}
+                />
               </div>
 
               <div className="flex flex-col-reverse gap-2 rounded-b-2xl border-t border-[#585759]/30 bg-[#585759]/5 p-5 sm:flex-row sm:justify-end sm:gap-3">
@@ -459,7 +382,7 @@ export default function TreinosPage() {
                   className="text-[#A6A6A6] hover:text-white">Cancelar</Button>
                 <Button type="submit" disabled={saving}
                   className="bg-[#F2B705] hover:bg-[#BF9004] text-[#0D0D0D] font-bold shadow-lg shadow-[#F2B705]/20">
-                  {saving ? 'Salvando...' : 'Salvar Ficha'}
+                  {saving ? 'Salvando...' : editingFichaId ? 'Salvar alterações' : 'Salvar ficha semanal'}
                 </Button>
               </div>
             </form>

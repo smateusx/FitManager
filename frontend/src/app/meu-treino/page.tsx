@@ -31,6 +31,7 @@ import { ProfileAvatar } from '@/components/profile-avatar'
 import { TreinosPreProntosAluno } from '@/components/treinos-pre-prontos-aluno'
 import { TreinoContextBanner } from '@/components/treino-context-banner'
 import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
+import { FichaSemanalResumo, FichaSemanalView } from '@/components/ficha-semanal-view'
 
 type Exercicio = {
   id: string
@@ -40,6 +41,7 @@ type Exercicio = {
   carga: string
   descanso: string
   ordem: number
+  dia_semana?: number | null
 }
 
 type Ficha = {
@@ -271,7 +273,7 @@ export default function MeuTreinoPage() {
                 <div className="space-y-4">
                   {fichas.map((ficha) => {
                   const isExpanded = expandedId === ficha.id
-                  const exs = (ficha.exercicios ?? []).sort((a, b) => a.ordem - b.ordem)
+                  const exs = ficha.exercicios ?? []
                   return (
                     <div key={ficha.id} className="border border-[#585759]/50 rounded-xl overflow-hidden bg-[#0D0D0D]/80 hover:border-[#585759] transition-colors">
                       <button
@@ -287,6 +289,9 @@ export default function MeuTreinoPage() {
                             {ficha.objetivo && (
                               <p className="text-[#A6A6A6] text-sm mt-0.5">{ficha.objetivo}</p>
                             )}
+                            <div className="mt-1">
+                              <FichaSemanalResumo exercicios={exs} />
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -302,100 +307,89 @@ export default function MeuTreinoPage() {
                       {isExpanded && (
                         <div className="border-t border-[#585759]/30 p-5">
                           {exs.length === 0 ? (
-                            <p className="text-[#585759] text-sm text-center py-4">Nenhum exercício nesta ficha.</p>
+                            <p className="py-4 text-center text-sm text-[#585759]">Nenhum exercício nesta ficha.</p>
                           ) : (
-                            <div className="space-y-3">
-                              {exs.map((ex, i) => (
-                                <div key={ex.id} className="p-4 rounded-xl bg-[#585759]/10 border border-[#585759]/20">
-                                  <div className="flex items-start gap-4">
-                                    <div className="w-7 h-7 rounded-full bg-[#F2B705]/20 flex items-center justify-center shrink-0 mt-0.5">
-                                      <span className="text-[#F2B705] text-xs font-bold">{i + 1}</span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <p className="text-white font-semibold flex-1 truncate">{ex.nome}</p>
-                                        <div className="flex items-center gap-2">
-                                          <button 
-                                            onClick={() => setShowingChartId(showingChartId === ex.id ? null : ex.id)}
-                                            className={`p-1.5 rounded-lg transition-colors ${showingChartId === ex.id ? 'bg-[#F2B705] text-[#0D0D0D]' : 'bg-[#585759]/30 text-[#A6A6A6] hover:text-[#F2B705]'}`}
-                                          >
-                                            <TrendingUp className="w-3.5 h-3.5" />
-                                          </button>
-                                          <button 
-                                            onClick={() => {
-                                              setRegisteringId(registeringId === ex.id ? null : ex.id)
-                                              setCargaValue(ex.carga?.replace('kg', '').trim() || '')
-                                              setRepsValue(ex.repeticoes?.split('-')[0] || '')
-                                            }}
-                                            className="text-[10px] font-bold uppercase tracking-tight px-2 py-1 rounded bg-[#F2B705] text-[#0D0D0D] hover:bg-[#F2B705]/80 transition-colors"
-                                          >
-                                            {registeringId === ex.id ? 'Cancelar' : 'Registrar'}
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <div className="flex flex-wrap gap-2 mt-2">
-                                        <span className="text-xs px-2 py-1 rounded-md bg-[#585759]/30 text-[#A6A6A6]">
-                                          {ex.series}x séries
-                                        </span>
-                                        <span className="text-xs px-2 py-1 rounded-md bg-[#585759]/30 text-[#A6A6A6]">
-                                          {ex.repeticoes} reps
-                                        </span>
-                                        {ex.carga && (
-                                          <span className="text-xs px-2 py-1 rounded-md bg-[#F2B705]/10 text-[#F2B705]">
-                                            {ex.carga}
-                                          </span>
-                                        )}
-                                        <span className="text-xs px-2 py-1 rounded-md bg-[#585759]/30 text-[#A6A6A6]">
-                                          {ex.descanso} descanso
-                                        </span>
-                                      </div>
-                                    </div>
+                            <FichaSemanalView
+                              exercicios={exs}
+                              destacarHoje
+                              renderExercicioExtra={(ex) => (
+                                <div className="mt-3">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setShowingChartId(showingChartId === ex.id ? null : ex.id ?? null)
+                                      }
+                                      className={`rounded-lg p-1.5 transition-colors ${
+                                        showingChartId === ex.id
+                                          ? 'bg-[#F2B705] text-[#0D0D0D]'
+                                          : 'bg-[#585759]/30 text-[#A6A6A6] hover:text-[#F2B705]'
+                                      }`}
+                                      aria-label="Ver evolução"
+                                    >
+                                      <TrendingUp className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!ex.id) return
+                                        setRegisteringId(registeringId === ex.id ? null : ex.id)
+                                        setCargaValue(ex.carga?.replace('kg', '').trim() || '')
+                                        setRepsValue(ex.repeticoes?.split(/[-–]/)[0]?.trim() || '')
+                                      }}
+                                      className="rounded bg-[#F2B705] px-2 py-1 text-[10px] font-bold uppercase tracking-tight text-[#0D0D0D] hover:bg-[#F2B705]/80"
+                                    >
+                                      {registeringId === ex.id ? 'Cancelar' : 'Registrar'}
+                                    </button>
                                   </div>
 
-                                  {/* Gráfico de Evolução */}
-                                  {showingChartId === ex.id && userId && (
+                                  {showingChartId === ex.id && userId && ex.id ? (
                                     <div className="mt-4 animate-in zoom-in-95 duration-200">
                                       <EvolutionChart exercicioId={ex.id} alunoId={userId} />
                                     </div>
-                                  )}
+                                  ) : null}
 
-                                  {/* Form Registro de Carga */}
-                                  {registeringId === ex.id && (
-                                    <div className="mt-4 pt-4 border-t border-[#585759]/20 animate-in fade-in slide-in-from-top-2 duration-200">
+                                  {registeringId === ex.id && ex.id ? (
+                                    <div className="mt-4 border-t border-[#585759]/20 pt-4 animate-in fade-in slide-in-from-top-2 duration-200">
                                       <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                          <label className="text-[10px] text-[#A6A6A6] uppercase font-bold mb-1 block">Peso (kg)</label>
-                                          <input 
-                                            type="text" 
+                                          <label className="mb-1 block text-[10px] font-bold uppercase text-[#A6A6A6]">
+                                            Peso (kg)
+                                          </label>
+                                          <input
+                                            type="text"
                                             value={cargaValue}
                                             onChange={(e) => setCargaValue(e.target.value)}
                                             placeholder="Ex: 50"
-                                            className="w-full bg-[#0D0D0D] border border-[#585759]/50 rounded-lg px-3 py-2 text-sm focus:border-[#F2B705] outline-none transition-colors"
+                                            className="w-full rounded-lg border border-[#585759]/50 bg-[#0D0D0D] px-3 py-2 text-sm outline-none transition-colors focus:border-[#F2B705]"
                                           />
                                         </div>
                                         <div>
-                                          <label className="text-[10px] text-[#A6A6A6] uppercase font-bold mb-1 block">Reps</label>
-                                          <input 
-                                            type="number" 
+                                          <label className="mb-1 block text-[10px] font-bold uppercase text-[#A6A6A6]">
+                                            Reps
+                                          </label>
+                                          <input
+                                            type="number"
                                             value={repsValue}
                                             onChange={(e) => setRepsValue(e.target.value)}
                                             placeholder="Ex: 12"
-                                            className="w-full bg-[#0D0D0D] border border-[#585759]/50 rounded-lg px-3 py-2 text-sm focus:border-[#F2B705] outline-none transition-colors"
+                                            className="w-full rounded-lg border border-[#585759]/50 bg-[#0D0D0D] px-3 py-2 text-sm outline-none transition-colors focus:border-[#F2B705]"
                                           />
                                         </div>
                                       </div>
-                                      <button 
+                                      <button
+                                        type="button"
                                         disabled={isSaving || !cargaValue || !repsValue}
-                                        onClick={() => handleSaveCarga(ex)}
-                                        className="w-full mt-3 bg-[#F2B705] text-[#0D0D0D] font-bold py-2 rounded-lg text-sm hover:brightness-110 transition-all disabled:opacity-50"
+                                        onClick={() => handleSaveCarga(ex as Exercicio)}
+                                        className="mt-3 w-full rounded-lg bg-[#F2B705] py-2 text-sm font-bold text-[#0D0D0D] transition-all hover:brightness-110 disabled:opacity-50"
                                       >
-                                        {isSaving ? 'Salvando...' : 'Confirmar Registro'}
+                                        {isSaving ? 'Salvando...' : 'Confirmar registro'}
                                       </button>
                                     </div>
-                                  )}
+                                  ) : null}
                                 </div>
-                              ))}
-                            </div>
+                              )}
+                            />
                           )}
                         </div>
                       )}
