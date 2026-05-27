@@ -120,3 +120,22 @@ export function presetParaForm(preset: ExercicioPreset): ExercicioSemanaForm {
     descanso: preset.descanso,
   }
 }
+
+export function normalizarNomeExercicio(nome: string): string {
+  return nome.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+}
+
+export function exercicioExisteNoGrupo(lista: ExercicioPreset[], nome: string): boolean {
+  const alvo = normalizarNomeExercicio(nome)
+  if (!alvo) return false
+  return lista.some((ex) => normalizarNomeExercicio(ex.nome) === alvo)
+}
+
+export function encontrarExercicioNoGrupo(
+  lista: ExercicioPreset[],
+  nome: string
+): ExercicioPreset | undefined {
+  const alvo = normalizarNomeExercicio(nome)
+  if (!alvo) return undefined
+  return lista.find((ex) => normalizarNomeExercicio(ex.nome) === alvo)
+}

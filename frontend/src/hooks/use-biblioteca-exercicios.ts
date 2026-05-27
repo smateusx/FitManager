@@ -7,6 +7,7 @@ import {
 } from '@/lib/firestore'
 import {
   cloneCatalogoPadrao,
+  exercicioExisteNoGrupo,
   type CatalogoExercicios,
   type ExercicioPreset,
   type GrupoMuscular,
@@ -71,10 +72,14 @@ export function useBibliotecaExercicios(academiaId: string | null) {
       const nome = preset.nome.trim()
       if (!nome) return { ok: false as const, erro: 'Informe o nome do exercício.' }
 
-      const duplicado = catalogo[grupo].some(
-        (ex) => ex.nome.localeCompare(nome, 'pt-BR', { sensitivity: 'base' }) === 0
-      )
-      if (duplicado) return { ok: false as const, erro: 'Este exercício já está na lista.' }
+      if (exercicioExisteNoGrupo(catalogo[grupo], nome)) {
+        return {
+          ok: false as const,
+          erro: `${nome}, já foi adicionado à lista.`,
+          duplicado: true as const,
+          nome,
+        }
+      }
 
       const proximo = {
         ...catalogo,
@@ -105,12 +110,17 @@ export function useBibliotecaExercicios(academiaId: string | null) {
       const nome = preset.nome.trim()
       if (!nome) return { ok: false as const, erro: 'Informe o nome do exercício.' }
 
-      const duplicado = catalogo[grupo].some(
-        (ex) =>
-          ex.nome !== nomeAtual &&
-          ex.nome.localeCompare(nome, 'pt-BR', { sensitivity: 'base' }) === 0
-      )
-      if (duplicado) return { ok: false as const, erro: 'Já existe outro exercício com este nome.' }
+      if (exercicioExisteNoGrupo(
+        catalogo[grupo].filter((ex) => ex.nome !== nomeAtual),
+        nome
+      )) {
+        return {
+          ok: false as const,
+          erro: `${nome}, já foi adicionado à lista.`,
+          duplicado: true as const,
+          nome,
+        }
+      }
 
       const proximo = {
         ...catalogo,

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { ConfirmActionDialog } from '@/components/confirm-action-dialog'
 import { InlineFeedback, type InlineFeedbackVariant } from '@/components/ui/inline-feedback'
 import {
+  exercicioExisteNoGrupo,
   GRUPOS_MUSCULARES,
   presetParaForm,
   type CatalogoExercicios,
@@ -55,6 +56,8 @@ export function BibliotecaExerciciosPicker({
 
   const lista = catalogo[grupoAtivo]
   const grupoLabel = GRUPOS_MUSCULARES.find((g) => g.id === grupoAtivo)?.label ?? 'Grupo'
+  const nomeNovoTrim = novoPreset.nome.trim()
+  const jaExisteNaLista = nomeNovoTrim.length > 0 && exercicioExisteNoGrupo(lista, nomeNovoTrim)
 
   useEffect(() => {
     if (!ultimoAdicionadoAoDia) return
@@ -75,6 +78,10 @@ export function BibliotecaExerciciosPicker({
 
   async function handleIncluirNaLista(e: React.FormEvent) {
     e.preventDefault()
+    if (jaExisteNaLista) {
+      mostrarFeedback('warning', `${nomeNovoTrim}, já foi adicionado à lista de ${grupoLabel}.`)
+      return
+    }
     const result = await adicionarNaLista(grupoAtivo, novoPreset)
     if (!result.ok) {
       mostrarFeedback('warning', result.erro)
@@ -368,8 +375,18 @@ export function BibliotecaExerciciosPicker({
                     placeholder="Nome do exercício"
                     required
                     autoFocus
-                    className="border-[#585759] bg-[#0D0D0D] text-white"
+                    aria-invalid={jaExisteNaLista}
+                    className={`border-[#585759] bg-[#0D0D0D] text-white ${
+                      jaExisteNaLista ? 'border-amber-500/60 ring-1 ring-amber-500/30' : ''
+                    }`}
                   />
+                  {jaExisteNaLista ? (
+                    <InlineFeedback
+                      variant="warning"
+                      message={`${nomeNovoTrim}, já foi adicionado à lista de ${grupoLabel}.`}
+                      className="text-xs"
+                    />
+                  ) : null}
                   <div className="grid grid-cols-3 gap-2">
                     <Input
                       type="number"
@@ -396,7 +413,7 @@ export function BibliotecaExerciciosPicker({
                     <Button
                       type="submit"
                       size="sm"
-                      disabled={saving || !novoPreset.nome.trim()}
+                      disabled={saving || !nomeNovoTrim || jaExisteNaLista}
                       className="bg-[#F2B705] text-[#0D0D0D] hover:bg-[#BF9004]"
                     >
                       <Plus className="mr-1 h-4 w-4" />
