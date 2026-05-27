@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, type Dispatch, type SetStateAction } from 'react'
 import { flushSync } from 'react-dom'
 import { Copy, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -34,7 +34,7 @@ type FichaSemanalEditorProps = {
   semana: SemanaTreinoForm
   diaAtivo: JsWeekday
   onDiaChange: (dia: JsWeekday) => void
-  onSemanaChange: (semana: SemanaTreinoForm) => void
+  onSemanaChange: Dispatch<SetStateAction<SemanaTreinoForm>>
 }
 
 export function FichaSemanalEditor({
@@ -49,8 +49,18 @@ export function FichaSemanalEditor({
   const exerciciosDia = semana[diaAtivo]
   const secaoExerciciosRef = useRef<HTMLDivElement>(null)
 
+  function updateDiaExercicios(
+    updater: (lista: ExercicioSemanaForm[]) => ExercicioSemanaForm[],
+    dia: JsWeekday = diaAtivo
+  ) {
+    onSemanaChange((prev) => ({
+      ...prev,
+      [dia]: updater(prev[dia]),
+    }))
+  }
+
   function setDiaExercicios(lista: ExercicioSemanaForm[]) {
-    onSemanaChange({ ...semana, [diaAtivo]: lista })
+    updateDiaExercicios(() => lista)
   }
 
   function scrollParaExercicios() {
@@ -69,54 +79,69 @@ export function FichaSemanalEditor({
     }
   }
 
-  function addExercicioDaBiblioteca(preset: ExercicioSemanaForm) {
-    const { lista, duplicado } = inserirExercicioNoDia(exerciciosDia, preset)
-    if (duplicado) return
+  function addExercicioDaBiblioteca(preset: ExercicioSemanaForm): boolean {
+    let duplicado = false
     flushSync(() => {
-      setDiaExercicios(lista)
+      updateDiaExercicios((lista) => {
+        const result = inserirExercicioNoDia(lista, preset)
+        duplicado = !!result.duplicado
+        return result.lista
+      })
     })
+    if (duplicado) return false
     scrollParaExercicios()
+    return true
   }
 
   function handleEscreverPersonalizado() {
-    const { lista, indice } = abrirLinhaPersonalizada(exerciciosDia, BLANK)
+    let indice = 0
     flushSync(() => {
-      setDiaExercicios(lista)
+      updateDiaExercicios((lista) => {
+        const result = abrirLinhaPersonalizada(lista, BLANK)
+        indice = result.indice
+        return result.lista
+      })
     })
     focarLinhaExercicio(indice)
   }
 
   function addExercicioPersonalizadoExtra() {
-    const { lista, indice } = abrirLinhaPersonalizada(exerciciosDia, BLANK)
+    let indice = 0
     flushSync(() => {
-      setDiaExercicios(lista)
+      updateDiaExercicios((lista) => {
+        const result = abrirLinhaPersonalizada(lista, BLANK)
+        indice = result.indice
+        return result.lista
+      })
     })
     focarLinhaExercicio(indice)
   }
 
   function removeExercicio(i: number) {
-    setDiaExercicios(exerciciosDia.filter((_, idx) => idx !== i))
+    updateDiaExercicios((lista) => lista.filter((_, idx) => idx !== i))
   }
 
   function updateExercicio(i: number, field: keyof ExercicioSemanaForm, value: string | number) {
-    setDiaExercicios(
-      exerciciosDia.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex))
+    updateDiaExercicios((lista) =>
+      lista.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex))
     )
   }
 
   function preencherExercicio(i: number, preset: ExercicioSemanaForm) {
-    const filled = { ...preset, carga: exerciciosDia[i]?.carga || preset.carga }
-    setDiaExercicios(
-      exerciciosDia
+    updateDiaExercicios((lista) => {
+      const filled = { ...preset, carga: lista[i]?.carga || preset.carga }
+      return lista
         .map((ex, idx) => (idx === i ? filled : ex))
         .filter((ex) => !isExercicioSemanaVazio(ex))
-    )
+    })
   }
 
   function copiarDe(diaOrigem: JsWeekday) {
     if (diaOrigem === diaAtivo) return
-    const copia = semana[diaOrigem].map((ex) => ({ ...ex }))
-    setDiaExercicios(copia)
+    onSemanaChange((prev) => ({
+      ...prev,
+      [diaAtivo]: prev[diaOrigem].map((ex) => ({ ...ex })),
+    }))
   }
 
   function limparDia() {
@@ -300,6 +325,7 @@ export function FichaSemanalEditor({
       </div>
 
       <BibliotecaExerciciosPicker
+        key={diaAtivo}
         biblioteca={biblioteca}
         exerciciosDoDia={exerciciosDia}
         onAdicionar={(ex) => addExercicioDaBiblioteca(ex)}

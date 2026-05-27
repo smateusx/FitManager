@@ -29,7 +29,7 @@ const PRESET_VAZIO: ExercicioPreset = {
 type BibliotecaExerciciosPickerProps = {
   biblioteca: ReturnType<typeof useBibliotecaExercicios>
   exerciciosDoDia?: ExercicioSemanaForm[]
-  onAdicionar: (exercicio: ExercicioSemanaForm) => void
+  onAdicionar: (exercicio: ExercicioSemanaForm) => boolean
   onAdicionarPersonalizado: () => void
 }
 
@@ -68,7 +68,22 @@ export function BibliotecaExerciciosPicker({
   const [incluindoNaLista, setIncluindoNaLista] = useState(false)
 
   const listaCatalogo = catalogo[grupoAtivo]
-  const nomesNoDia = useMemo(() => nomesExerciciosNoDia(exerciciosDoDia), [exerciciosDoDia])
+  const chaveNomesDoDia = exerciciosDoDia
+    .map((ex) => normalizarNomeExercicio(ex.nome))
+    .filter(Boolean)
+    .sort()
+    .join('\0')
+  const [ocultosImediatos, setOcultosImediatos] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    setOcultosImediatos(new Set())
+  }, [chaveNomesDoDia])
+
+  const nomesNoDia = useMemo(() => {
+    const nomes = nomesExerciciosNoDia(exerciciosDoDia)
+    for (const chave of ocultosImediatos) nomes.add(chave)
+    return nomes
+  }, [exerciciosDoDia, ocultosImediatos])
   const lista = modoEdicao
     ? listaCatalogo
     : listaCatalogo.filter((preset) => !nomesNoDia.has(normalizarNomeExercicio(preset.nome)))
@@ -95,11 +110,22 @@ export function BibliotecaExerciciosPicker({
 
   function handleAdicionarAoDia(preset: ExercicioPreset) {
     if (modoEdicao) return
-    if (nomesNoDia.has(normalizarNomeExercicio(preset.nome))) {
-      mostrarFeedback('warning', `${preset.nome}, já está no dia de hoje.`)
+    const chave = normalizarNomeExercicio(preset.nome)
+    if (!chave || nomesNoDia.has(chave)) {
+      mostrarFeedback('warning', `${preset.nome}, já está neste dia.`)
       return
     }
-    onAdicionar(presetParaForm(preset))
+    setOcultosImediatos((prev) => new Set(prev).add(chave))
+    const adicionado = onAdicionar(presetParaForm(preset))
+    if (!adicionado) {
+      setOcultosImediatos((prev) => {
+        const next = new Set(prev)
+        next.delete(chave)
+        return next
+      })
+      mostrarFeedback('warning', `${preset.nome}, já está neste dia.`)
+      return
+    }
     setUltimoAdicionadoAoDia(preset.nome)
     mostrarFeedback('success', `${preset.nome}, adicionado com sucesso`)
   }
